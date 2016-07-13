@@ -9,8 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
-folder = os.path.expanduser('~/Dropbox/Projects/diffraction/')
-form_factor = os.path.join(folder, 'form_factor.csv')
+form_factor = os.path.join('data', 'form_factor.csv')
 
 df_form = pd.read_csv(form_factor, index_col=0)
 

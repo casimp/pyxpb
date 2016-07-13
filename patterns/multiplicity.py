@@ -10,9 +10,8 @@ import pandas as pd
 
 plt.style.use('ggplot')
 
-folder = os.path.expanduser('~/Dropbox/Projects/diffraction/')
-lattice_params = os.path.join(folder, 'lattice_params.csv')
-miller_info = os.path.join(folder, 'miller_info.csv')
+lattice_params = os.path.join('data', 'lattice_params.csv')
+miller_info = os.path.join('data', 'miller_info.csv')
 
 df_latt = pd.read_csv(lattice_params, index_col=0)
 df_miller = pd.read_csv(miller_info)
