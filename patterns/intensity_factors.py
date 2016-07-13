@@ -3,52 +3,60 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-import os
-
 import numpy as np
-import matplotlib.pyplot as plt
 import pandas as pd
 
-form_factor = os.path.join('data', 'form_factor.csv')
-
-df_form = pd.read_csv(form_factor, index_col=0)
+df = pd.read_csv(r'data/form_factor.csv', index_col=0)
 
 
-def scattering_factor(element, q=None, plot=False):
-    if q is None:
-        q = np.linspace(0, 25, 1000)
-    a = [df_form.loc[element][i] for i in ['a0', 'a1', 'a2', 'a3']]
-    b = [df_form.loc[element][i] for i in ['b0', 'b1', 'b2', 'b3']]
-    c = df_form.loc[element]['c']
+def scattering_factor(element, q):
+    """
+    Atomic scattering factor as a function of q for a monatomic material.
+    The values are calculated according to the 9-parameter equation produced
+    by Cromer and Mann.
+    """
+    try:
+        a = [df.loc[element][i] for i in ['a0', 'a1', 'a2', 'a3']]
+        b = [df.loc[element][i] for i in ['b0', 'b1', 'b2', 'b3']]
+        c = df.loc[element]['c']
+    except KeyError:
+        print('Invalid element selection - '
+              'valid options are as follows:{}'.format(df.index))
+        raise
 
     i_sf = np.sum([a[i] * np.exp(-b[i] * (q/(4*np.pi))**2)
                    for i in range(4)], axis=0) + c
-    if plot:
-        plt.plot(q, i_sf)
     return i_sf
 
 
-def scattering_factor_complex(elements, q=None, plot=False):
-    return None
+def scattering_factor_complex(elements, q):
+    """
+    Atomic scattering for polyvalent materials.
+    * More difficult to implement *
+    """
+    pass
 
 
-def temperature_factor(q, B=1, plot=False):
-    if q is None:
-        q = np.linspace(0, 25, 1000)
-    i_tf = np.exp(-B * (q / (4 * np.pi)) ** 2)
-    if plot:
-        plt.plot(q, i_tf)
+def temperature_factor(q, b=1):
+    """
+    Thermal scattering as related to the Debye-Waller or B factor and q (A-1).
+    B is typically in the range 0.5-1.5 for inorganic materials.
+    """
+    i_tf = np.exp(-b * (q / (4 * np.pi)) ** 2)
     return i_tf
 
 
-def lorentz_polarization_factor(two_theta=None, plot=False):
-    if two_theta is None:
-        two_theta = np.linspace(0, np.pi, 1000)
+def lorentz_polarization_factor(two_theta):
+    """
+    The combined lorentz and polarization factors, which depend on on the
+    diffracted angle (2theta).
+    """
     theta = two_theta
     lorentz = 1 / (4 * np.cos(theta) * np.sin(theta) ** 2)
     polarization = (1 + np.cos(2 * theta)**2) / 2
     i_lp = lorentz * polarization
-    if plot:
-        plt.plot(two_theta, i_lp)
     return i_lp
 
+
+if __name__ == '__main__':
+    scattering_factor('ds', 2)

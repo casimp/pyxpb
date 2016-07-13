@@ -5,9 +5,9 @@ from __future__ import unicode_literals
 
 import numpy as np
 
-h = 6.62607004 * 10**-34
-c = 2.99792458 * 10**8
-eV = 1.60218*10**-19
+h = 6.62607004 * 10 ** -34
+c = 2.99792458 * 10 ** 8
+eV = 1.60218 * 10 ** -19
 
 
 def e_to_w(energy):
