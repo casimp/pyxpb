@@ -46,7 +46,7 @@ def temperature_factor(q, b=1):
     return i_tf
 
 
-def lorentz_polarization_factor(two_theta):
+def lp_factor(two_theta):
     """
     The combined lorentz and polarization factors, which depend on on the
     diffracted angle (2theta).
