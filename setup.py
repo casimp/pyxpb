@@ -13,7 +13,7 @@ setup(
     url='https://github.com/casimp/pyxe-patterns',
     download_url = 'https://github.com/casimp/pyxe/tarball/v0.1.0',
     license='LICENSE.txt',
-    description='Create 1D XRD patterns and 2D Debye-Scherrer ringe for siple material systems/diffraction setups.',
+    description='Create 1D XRD patterns and 2D Debye-Scherrer ringe for simple material systems/diffraction setups.',
     keywords = ['XRD', 'EDXD', 'x-ray', 'diffraction', 'strain', 'synchrotron'],
 #    long_description=open('description').read(),
     classifiers=[
