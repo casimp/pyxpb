@@ -54,7 +54,7 @@ def cubic_multiplicity(structure, N):
     multiplicites are summed and returned according to lowest h
     (e.g. hkl = (2,2,1), M = 24 + 6)
     """
-    print(structure, N)
+    # print(structure, N)
     factor = {'hkl': 48, 'hhl': 24, 'hh0': 12, '0kk': 12, 'hhh': 8, 'hk0': 24,
               'h0l': 24, '0kl': 24, 'h00': 6, '0k0': 6, '00l': 6}
 
@@ -65,8 +65,8 @@ def cubic_multiplicity(structure, N):
 
     # The hkl indices are correct for simple cubic but if bcc/fcc:
     if structure.lower() == 'bcc':
-        print(structure, N)
-        hkl = [i for i in hkl if (i[0] + i[1] + i[2]) % 2 != 0]
+        # print(structure, N)
+        hkl = [i for i in hkl if (i[0] + i[1] + i[2]) % 2 == 0]
     elif structure.lower() == 'fcc':
         hkl = [i for i in hkl if i[0] % 2 == i[1] % 2 == i[2] % 2]
 
