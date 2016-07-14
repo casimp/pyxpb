@@ -5,19 +5,25 @@ from __future__ import unicode_literals
 
 import numpy as np
 
-from conversions import e_to_w
+from conversions import tth_to_q
+
+class Detector(object):
+    def __init__(self, shape, pixel_size=0.2):
+        y, x = np.ogrid[:float(shape[0]), :float(shape[1])]
+        x, y = x - shape[0] / 2, y - shape[1] / 2
+        self.r = (x ** 2 + y ** 2) ** .5
+        self.shape = shape
+        self.pixel_size = pixel_size
+        self.phi = np.arctan(y / x)
+        self.energy = None
+        self.sample_detector = None
+
+    def setup(self, energy, sample_detector):
+        self.sample_detector = sample_detector
+        self.energy = energy
+        self.two_theta = np.arctan(self.r * self.pixel_size / sample_detector)
+        self.q = tth_to_q(self.two_theta, energy)
 
 
-def extract_q(energy, detector_shape=(2000, 2000), pixel_size=0.2,
-              sample_to_detector=1000):
-
-    n_steps = ((detector_shape[0] / 2) ** 2 +
-               (detector_shape[1] / 2) ** 2) ** 0.5
-
-    r_max = n_steps * pixel_size
-
-    theta_max = np.arctan(r_max / sample_to_detector)
-    q_max = (4 * np.pi * np.sin(theta_max)) / e_to_w(energy)
-    return np.linspace(0, q_max, n_steps) / (10 ** 10)
 
 
