@@ -28,8 +28,8 @@ def e_to_q(energy, two_theta):
     """ Takes energy (keV) and 2theta (rad) -> returns q (A-1) """
     wavelength = e_to_w(energy)
     q_per_m = np.sin(two_theta / 2) * 4 * np.pi / wavelength
-    q_per_A = q_per_m / (10**10)  # convert to A^-1
-    return q_per_A
+    q_per_a = q_per_m / (10**10)  # convert to A^-1
+    return q_per_a
 
 
 def q_to_e(q, two_theta):
@@ -39,12 +39,20 @@ def q_to_e(q, two_theta):
     return w_to_e(wavelength)
 
 
-def q_to_2th(q, energy):
+def q_to_tth(q, energy):
     """ Takes q (A-1) and energy (keV) -> returns 2theta (rad) """
     wavelength = e_to_w(energy)
     q_per_m = q * (10**10)
     two_theta = 2 * np.arcsin(q_per_m * wavelength / (4 * np.pi))
     return two_theta
+
+def tth_to_q(two_theta, energy):
+    """ Takes 2theta (rad) and energy (keV) -> returns q (A^-1) """
+    wavelength = e_to_w(energy)
+
+    q_per_m = np.sin(two_theta / 2) * 4 * np.pi / wavelength
+    q_per_a = q_per_m / (10**10)
+    return q_per_a
 
 
 if __name__ == '__main__':
