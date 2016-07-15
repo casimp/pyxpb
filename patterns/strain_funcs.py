@@ -5,15 +5,6 @@ from __future__ import unicode_literals
 
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.interpolate import InterpolatedUnivariateSpline, interp1d
-
-from multiplicity import peak_details
-from beamline_details import edxd_info
-from conversions import e_to_q, q_to_e, q_to_tth
-from intensity_factors import scattering_factor, temperature_factor, lp_factor
-from detectors import BaseDetector
-
-plt.style.use('ggplot')
 
 
 def strained_gaussians(x, *p):

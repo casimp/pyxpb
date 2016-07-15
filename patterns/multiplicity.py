@@ -5,11 +5,13 @@ from __future__ import unicode_literals
 
 from collections import defaultdict
 from itertools import product
+import os
 
 import numpy as np
 import pandas as pd
 
-df_latt = pd.read_csv(r'data/lattice_params.csv', index_col=0)
+fname = os.path.join(os.path.dirname(__file__), 'data/lattice_params.csv')
+df_latt = pd.read_csv(fname, index_col=0)
 
 
 def cubic_permutations(N):

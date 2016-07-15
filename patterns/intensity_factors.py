@@ -5,8 +5,11 @@ from __future__ import unicode_literals
 
 import numpy as np
 import pandas as pd
+import os
 
-df = pd.read_csv(r'data/form_factor.csv', index_col=0)
+
+fname = os.path.join(os.path.dirname(__file__), 'data/form_factor.csv')
+df = pd.read_csv(fname, index_col=0)
 
 
 def scattering_factor(element, q):

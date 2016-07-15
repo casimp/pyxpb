@@ -15,7 +15,6 @@ setup(
     license='LICENSE.txt',
     description='Create 1D XRD patterns and 2D Debye-Scherrer ringe for simple material systems/diffraction setups.',
     keywords = ['XRD', 'EDXD', 'x-ray', 'diffraction', 'strain', 'synchrotron'],
-#    long_description=open('description').read(),
     classifiers=[
         "Development Status :: 3 - Alpha",
         "License :: OSI Approved :: MIT License",

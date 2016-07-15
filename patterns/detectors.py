@@ -5,7 +5,8 @@ from __future__ import unicode_literals
 
 import numpy as np
 
-from conversions import tth_to_q
+from .conversions import tth_to_q
+
 
 class BaseDetector(object):
     def __init__(self, shape, pixel_size=0.2):

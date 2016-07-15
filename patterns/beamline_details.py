@@ -3,9 +3,12 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import os
 import numpy as np
 
-i12_e_flux = np.loadtxt('data/i12_energy_distribution.csv', delimiter=',')
+fname = os.path.join(os.path.dirname(__file__), 'data/i12_energy_distribution.csv')
+i12_e_flux = np.loadtxt(fname, delimiter=',')
+
 
 i12 = {'energy': i12_e_flux[:, 0],
        'flux': i12_e_flux[:, 1],
