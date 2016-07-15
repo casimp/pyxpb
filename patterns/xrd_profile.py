@@ -9,79 +9,47 @@ from scipy.interpolate import InterpolatedUnivariateSpline, interp1d
 
 from multiplicity import peak_details
 from beamline_details import edxd_info
-from conversions import e_to_q, q_to_e, q_to_tth, tth_to_q
+from conversions import e_to_q, q_to_e, q_to_tth
 from intensity_factors import scattering_factor, temperature_factor, lp_factor
-from detectors import Detector
+from detectors import BaseDetector
+from strain_funcs import strain_trans, strained_gaussians
 
 plt.style.use('ggplot')
 
 
-def strained_gaussians(x, *p):
-    """
-    Guassian curve fit for diffraction data.
-
-    #   Peak height above background : p[0]
-    #   Central value                : p[1]
-    #   Standard deviation           : p[2]
-    #   Strain                       : p[3]
-    """
-    img = np.zeros_like(x)
-    for i in range(p[0].size):
-        q0 = p[1][i] + p[1][i] * p[3]
-        img = img + p[0][i] * np.exp(- (x - q0)**2 / (2. * p[2][i]**2))
-    return img
-
-
-def strain_trans(e_xx, e_yy, e_xy, phi):
-    e_xx_1 = ((((e_xx + e_yy) / 2) + ((e_xx - e_yy) * np.cos(2 * phi) / 2)) +
-              (e_xy * np.sin(2 * phi)))
-    return e_xx_1
-
-
-def relative_peak_heights(q0, a, sigma):
-    # Flatten all dicts - extracting all Gaussian parameters
-    # print(q0)
-    q0_conc = np.concatenate([q0[i] for i in q0])
-    a_conc = np.concatenate([a[i] for i in a])
-    sigma_conc = np.concatenate([sigma[i] for i in sigma])
-    a_max = np.max(strained_gaussians(q0_conc, a_conc, q0_conc, sigma_conc, 0))
-    # print(q0)
-    a_rel = {}
-    for material in a:
-        print(q0)
-        q0_ = q0[material]
-        a_ = a[material]
-        sigma_ = sigma[material]
-        a_rel[material] = strained_gaussians(q0_, a_, q0_, sigma_, 0) / a_max
-
-    return a_rel
-
-class Intensity(object):
+class Peaks(object):
 
     label_dict = {'q': r'q (A$^{-1}$)',
                   '2theta': r'$2\theta$',
                   'energy': 'Energy (keV)'}
 
     def __init__(self):
+        """ Peak helper class for calculation and location of XRD peaks. """
         self.energy, self.two_theta = None
         self.q_range = None
         self.q0, self.hkl = None, None
         self.a, self.sigma = None, None
         self.sigma_q, self.flux_q = None, None
-        self.method = None
+        self.method, self.convert = None, None
+        self.materials = None
 
-    def add_peaks(self, material, b=1, weight=1):
-        """
+    def add_peaks(self, material, b=1., weight=1.):
+        """ Add peak locations and intensities for a given material.
+
         Find peaks and relative intensities based on material and Debye-Waller
         or B factor (generally between 0.5 and 1.5 in inorganic materials).
         Deduce associated fit parameters for gaussian intensity distribution.
+
+        Args:
+            material (str): Element symbol (compound formula)
+            b (float): B factor
+            weight (float): Relative peak weight (useful for mixtures/phases)
         """
         # Store material, b factor and weight for recalculation
         self.materials[material] = {'b': b, 'weight': weight}
 
         # Find peaks and multiplicity
         q0, m, hkl = peak_details(np.max(self.q_range), material)
-        # print([(i, j) for i, j in zip(q0, hkl)])
         self.q0[material], self.hkl[material] = q0, hkl
 
         # Intensity factors
@@ -98,13 +66,38 @@ class Intensity(object):
         peak_height = integrated_intensity / (sigma * (2 * np.pi) ** 0.5)
         self.a[material] = peak_height
 
-    def intensity(self, x_axis='q', background=0.01,
-                  e_xx=0, e_yy=0, e_xy=0, phi=0):
-        """
-        Returns normalised intensity against 'q' or 'energy' / '2theta'.
+    def relative_heights(self):
+        """ Computes relative peak heights wrt. total intensity profile.
 
-        It there are multiple materials then 'separate', 'total'
-        or 'all' intensity profiles can be returned.
+        Returns:
+            dict: Relative peak heights for each material
+        """
+        q0 = np.concatenate([self.q0[i] for i in self.q0])
+        a = np.concatenate([self.a[i] for i in self.a])
+        sigma = np.concatenate([self.sigma[i] for i in self.sigma])
+        a_max = np.max(strained_gaussians(q0, a, q0, sigma, 0))
+        a_rel = {}
+        for mat in self.a:
+            q0_, a_, sigma_ = self.q0[mat], self.a[mat], self.sigma[mat]
+            a_rel[mat] = strained_gaussians(q0_, a_, q0_, sigma_, 0) / a_max
+        return a_rel
+
+    def intensity(self, x_axis='q', background=0.01, strain_tensor=(0, 0, 0),
+                  phi=0):
+        """ Computes normalised intensity against 'q' or 'energy' / '2theta'.
+
+        Specify the strain tensor (e_xx, e_yy, e_xy) for strained diffraction
+        peaks at a given angle (phi).
+
+        Args:
+            x_axis (str): Plot relative to 'q' or 'energy' / '2theta'
+            background (float): Relative background noise
+            strain_tensor (tuple): Strain tensor components (e_xx, e_yy, e_xy)
+            phi (float): Azimuthal angle (rad)
+
+        Returns:
+            x (np.ndarray): 1D positional array ('q' or 'energy' / '2theta')
+            intensity (dict): Material specific + total rel. intensity profiles
         """
         # Select label and convert x if selected
         valid = ['q'] + ['2theta' if self.method == 'mono' else 'energy']
@@ -112,6 +105,7 @@ class Intensity(object):
         assert x_axis in valid, error
 
         # Calculate the normal strain wrt. phi for each pixel
+        e_xx, e_yy, e_xy = strain_tensor
         strain = strain_trans(e_xx, e_yy, e_xy, phi)
         i = {}
         for mat in self.q0:
@@ -129,18 +123,36 @@ class Intensity(object):
         return x, i
 
     def plot_intensity(self, x_axis='q', plot_type='all', exclude_labels=0.02,
-                       background=0.02, e_xx=0, e_yy=0, e_xy=0, phi=0):
+                       background=0.02, strain_tensor=(0., 0., 0.), phi=0):
+        """ Plot normalised intensities against 'q' or 'energy' / '2theta'.
 
+        Specify the strain tensor (e_xx, e_yy, e_xy) for strained diffraction
+        peaks at a given angle (phi). If there are multiple materials there
+        is the option to plot each material separately, or the total intensity
+        or both of these. Background noise can be relative to max intensity.
 
+        Note: Background noise not used for 'separate' plots.
 
-        x, i = self.intensity(x_axis, background, e_xx, e_yy, e_xy, phi)
+        Args:
+            x_axis (str): Plot relative to 'q' or 'energy' / '2theta'
+            plot_type (str): Plot 'separate' intensities, 'total' or 'both'.
+            exclude_labels (float): Relative maxima for peak label exclusion
+            background (float): Relative background noise
+            strain_tensor (tuple): Strain tensor components (e_xx, e_yy, e_xy)
+            phi (float): Azimuthal angle (rad)
+        """
+        x, i = self.intensity(x_axis, background, strain_tensor, phi)
         i_total = i.pop('total')
         i_total_noiseless = np.sum([i[mat] for mat in i], axis=0)
-        noise_factor =  np.max(i_total) / np.max(i_total_noiseless)
-        print(noise_factor)
+        noise_factor = np.max(i_total) / np.max(i_total_noiseless)
+        if plot_type == 'separate':
+            i_max = np.max([i[mat] for mat in i])
+            noise_factor = i_max / np.max(i_total_noiseless)
+            for material in i:
+                i[material] /= i_max
 
-
-        a_rel = relative_peak_heights(self.q0, self.a, self.sigma)
+        a_rel = self.relative_heights()
+        e_xx, e_yy, e_xy = strain_tensor
         strain = strain_trans(e_xx, e_yy, e_xy, phi)
         if plot_type == 'all' or plot_type == 'separate':
             for material in i:
@@ -151,7 +163,7 @@ class Intensity(object):
 
                     if a_ > exclude_labels:
                         x_ = x0[idx] * (1 + strain)
-                        a_h = 0.005 + a_ / noise_factor# - a_ * background / 2
+                        a_h = 0.005 + a_ / noise_factor
                         plt.annotate(hkl[idx], xy=(x_, a_h),
                                      xytext=(0, 0), textcoords='offset points',
                                      ha='center', va='bottom')
@@ -167,11 +179,23 @@ class Intensity(object):
         plt.show()
 
 
-class MonochromaticIntensity(Intensity):
+class MonoDetector(Peaks):
     def __init__(self, detector_shape=(2000, 2000), pixel_size=0.2,
                  sample_to_detector=1000, energy=100, delta_energy=0.5):
+        """ Instantiates a new x-ray diffraction setup (monochromatic beam).
 
-        self.detector = Detector(detector_shape, pixel_size)
+        Basic monochromatic detector with complete setup defined through
+        the sample to detector and energy parameters. The uncertainty in
+        beam energy will be used to define peaks widths.
+
+        Args:
+            detector_shape (tuple): Detector dimensions (x, y) in pixels
+            pixel_size (float): Pixel size (mm)
+            sample_to_detector: Sample to detector distance (mm)
+            energy: Beam energy (keV)
+            delta_energy: Energy resolution/divergence (keV)
+        """
+        self.detector = BaseDetector(detector_shape, pixel_size)
         self.detector.setup(energy, sample_to_detector)
         r_max, q_max = np.max(self.detector.r), np.max(self.detector.q)
 
@@ -186,6 +210,12 @@ class MonochromaticIntensity(Intensity):
         self.method = 'mono'
 
     def new_setup(self, energy, sample_detector):
+        """ Resets the experimental setup and re-computes peak parameters.
+
+        Args:
+            energy (float): Beam energy in keV
+            sample_detector (float): sample to detector distance (mm)
+        """
         self.detector.setup(energy, sample_detector)
         r_max, q_max = np.max(self.detector.r), np.max(self.detector.q)
         self.q_range = np.linspace(0, q_max, int(r_max))
@@ -195,9 +225,10 @@ class MonochromaticIntensity(Intensity):
             weight = self.materials[material]['weight']
             self.add_peaks(material, b, weight)
 
-    def rings(self, e_xx=0, e_yy=0, e_xy=0, exclude_criteria=0.01, crop=0,
-              background=0.02):
-        """
+    def rings(self, exclude_criteria=0.01, crop=0.0, background=0.02,
+              strain_tensor=(0., 0., 0.)):
+        """ Computes detector sized array containing Debye-Scherrer rings.
+
         Returns a 2D numpy array (image) containing the Debye-Scherrer rings
         for the previously specified detector/sample setup. Specify the
         strain tensor (e_xx, e_yy, e_xy) for strained diffraction rings.
@@ -206,7 +237,14 @@ class MonochromaticIntensity(Intensity):
         (i.e. > 1000 x 1000) - there are therefore options to remove weak
         reflections (recommended at 0.01) and to crop the detector.
 
-        Returned array is scaled according to the maximum peak height.
+        Args:
+            exclude_criteria (float): Relative peak maxima for peak exclusion
+            crop (float): Crop fraction of detector dimensions
+            background (float): Relative background noise
+            strain_tensor (tuple): Strain tensor components (e_xx, e_yy, e_xy)
+
+        Returns:
+            np.ndarray: 2D array scaled according to the maximum peak height.
         """
         # Extract data from detector object
         crop = [int(crop * i / 2) for i in self.detector.shape]
@@ -214,7 +252,8 @@ class MonochromaticIntensity(Intensity):
         phi = self.detector.phi[crop[0]:-crop[0], crop[1]:-crop[1]]
         q = self.detector.q[crop[0]:-crop[0], crop[1]:-crop[1]]
 
-       # Calculate the normal strain wrt. phi for each pixel
+        # Calculate the normal strain wrt. phi for each pixel
+        e_xx, e_yy, e_xy = strain_tensor
         strain = strain_trans(e_xx, e_yy, e_xy, phi)
 
         # Flatten all dicts - extracting all Gaussian parameters
@@ -231,12 +270,45 @@ class MonochromaticIntensity(Intensity):
         img /= np.max(a_max)
         img += np.random.rand(*phi.shape) * background
 
-        return img / np.nanmax(img) # rescale
+        return img / np.nanmax(img)  # Rescale
+
+    def plot_rings(self, exclude_criteria=0.01, crop=0.,  background=0.02,
+                   strain_tensor=(0, 0, 0)):
+        """ Plots an image array containing Debye-Scherrer rings.
+
+        Plots the 2D numpy array (image) containing the Debye-Scherrer rings
+        for the previously specified detector/sample setup. Specify the
+        strain tensor (e_xx, e_yy, e_xy) for strained diffraction rings.
+
+        Can be computationally expensive for large detectors sizes
+        (i.e. > 1000 x 1000) - there are therefore options to remove weak
+        reflections (recommended at 0.01) and to crop the detector.
+
+        Args:
+            exclude_criteria (float): Relative peak maxima for peak exclusion
+            crop (float): Crop fraction of detector dimensions
+            background (float): Relative background noise
+            strain_tensor (tuple): Strain tensor components (e_xx, e_yy, e_xy)
+        """
+        img = self.rings(exclude_criteria, crop, background, strain_tensor)
+        plt.imshow(img)
+        plt.show()
 
 
-class EnergyDispersiveIntensity(Intensity):
+class EnergyDetector(Peaks):
 
     def __init__(self, two_theta=np.pi*(1/36), beamline='i12'):
+        """ Instantiates a new x-ray diffraction setup (energy dispersive).
+
+        Basic energy dispersive detector with complete experimental setup
+        defined via the diffracted angle (two theta). The beamline parameters -
+        energy vs. flux and energy resolution are read in by specifying a
+        known beamline(currently only DLS i12)
+
+        Args:
+            two_theta (float): Diffracted angle (rad)
+            beamline (str): Specified beamline (currently only 'i12' available)
+        """
         self.two_theta = two_theta
         self.energy = edxd_info[beamline]['energy']
 
@@ -258,20 +330,10 @@ class EnergyDispersiveIntensity(Intensity):
 
 
 if __name__ == '__main__':
-    test = MonochromaticIntensity(detector_shape=(2000,2000), pixel_size=.2,
-                                  energy=100, delta_energy=1,
-                                  sample_to_detector=1000)
-    test.add_peaks('Al', weight=2)
+    test = MonoDetector(detector_shape=(2000, 2000), pixel_size=0.2,
+                        energy=100, delta_energy=1, sample_to_detector=1000)
+    test.add_peaks('Al')
     test.add_peaks('Fe')
-    # print(test.q0)
-    test.plot_intensity(x_axis='2theta', exclude_labels=0.05, background=0.01)
-    # plt.imshow(test.rings(0.2, 0.1, 0.05, exclude_criteria=0, crop=0.3))
-    # plt.show()
-    # test.new_setup(125, 500)
-    # plt.imshow(test.rings(0.2, 0.1, 0.05, exclude_criteria=0.01, crop=0.3))
-    # print(test.q0)
-    #test.plot_intensity(x_axis='2theta')
-    #cProfile.run('test.rings(0.2, 0.1, 0.05, exclude_criteria=0.01, crop=0.3)')
-    #cProfile.run('test.rings(0.2, 0.1, 0.05, exclude_criteria=0, crop=0)')
-    print(np.nanmax(test.rings(0.2, 0.1, 0.05, exclude_criteria=0.01, crop=0.3)))
-    plt.show()
+    test.plot_intensity(x_axis='2theta', plot_type='separate',
+                        exclude_labels=0.05, background=0.3)
+    test.plot_rings(0.01, 0.3, strain_tensor=(0.2, 0.1, 0.05))
