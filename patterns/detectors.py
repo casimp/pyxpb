@@ -7,7 +7,7 @@ import numpy as np
 
 from conversions import tth_to_q
 
-class Detector(object):
+class BaseDetector(object):
     def __init__(self, shape, pixel_size=0.2):
         y, x = np.ogrid[:float(shape[0]), :float(shape[1])]
         x, y = x - shape[0] / 2, y - shape[1] / 2
