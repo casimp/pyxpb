@@ -5,16 +5,34 @@ from __future__ import unicode_literals
 
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.interpolate import InterpolatedUnivariateSpline
 
 from .multiplicity import peak_details
-from .beamline_details import edxd_info
-from .conversions import e_to_q, q_to_e, q_to_tth
+from .conversions import q_to_tth, q_to_e
 from .intensity_factors import scattering_factor, temperature_factor, lp_factor
-from .detectors import BaseDetector
-from .strain_funcs import strain_trans, strained_gaussians
 
 plt.style.use('ggplot')
+
+
+def strained_gaussians(x, *p):
+    """
+    Guassian curve fit for diffraction data.
+
+    #   Peak height above background : p[0]
+    #   Central value                : p[1]
+    #   Standard deviation           : p[2]
+    #   Strain                       : p[3]
+    """
+    img = np.zeros_like(x)
+    for i in range(p[0].size):
+        q0 = p[1][i] + p[1][i] * p[3]
+        img = img + p[0][i] * np.exp(- (x - q0)**2 / (2. * p[2][i]**2))
+    return img
+
+
+def strain_trans(e_xx, e_yy, e_xy, phi):
+    e_xx_1 = ((((e_xx + e_yy) / 2) + ((e_xx - e_yy) * np.cos(2 * phi) / 2)) +
+              (e_xy * np.sin(2 * phi)))
+    return e_xx_1
 
 
 class Peaks(object):
@@ -23,15 +41,26 @@ class Peaks(object):
                   '2theta': r'$2\theta$',
                   'energy': 'Energy (keV)'}
 
-    def __init__(self):
-        """ Peak helper class for calculation and location of XRD peaks. """
-        self.energy, self.two_theta = None
-        self.q_range = None
-        self.q0, self.hkl = None, None
-        self.a, self.sigma = None, None
-        self.sigma_q, self.flux_q = None, None
-        self.method, self.convert = None, None
-        self.materials = None
+    def __init__(self, r, q, energy, two_theta, phi, sigma_q, flux_q, method):
+
+        self.method = method
+        self.two_theta = two_theta
+        self.phi = phi
+        self.energy = energy
+        self.q = q
+        self.sigma_q = sigma_q
+        self.flux_q = flux_q
+        self.r = r
+
+        # Empty dicts for storing peaks / materials
+        self.a, self.sigma, self.q0 = {}, {}, {}
+        self.materials, self.hkl = {}, {}
+
+    def convert(self, q):
+        if self.method == 'mono':
+            return q_to_tth(self.q, self.energy) * 180 / np.pi
+        else:
+            return q_to_e(self.q, self.two_theta)
 
     def intensity_factors(self, material, b=1, q=None, plot=True, x_axis='q'):
         """ Calculates normalised intensity factors (with option for plotting).
@@ -54,10 +83,14 @@ class Peaks(object):
         error = "Can't plot wrt. {} in {} mode".format(x_axis, self.method)
         assert x_axis in valid, error
 
-        if q is None:
-            q = self.q_range
-        # Intensity factors
         method = self.method
+
+        if q is None and method == 'mono':
+            q = np.linspace(0, self.q.max(), self.r.max())
+        else:
+            q = self.q if q is None else q
+        # Intensity factors
+
         i_lp = lp_factor(q_to_tth(q, self.energy)) if method == 'mono' else 1
         i_sf = scattering_factor(material, q)  # consider adding complex
         i_tf = temperature_factor(q, b)
@@ -70,6 +103,7 @@ class Peaks(object):
             for i_f, label in zip([flux, i_lp, i_sf, i_tf], labels):
                 if isinstance(i_f, int) or len(i_f) == 1:
                     i_f *= np.ones_like(q)
+                print(q.shape, i_f.shape)
                 plt.plot(q[ind], i_f[ind] / i_f[ind].max(), '-', label=label)
             total = i_sf ** 2 * i_lp * i_tf * flux
             total = total[ind]
@@ -99,7 +133,7 @@ class Peaks(object):
         self.materials[material] = {'b': b, 'weight': weight}
 
         # Find peaks and multiplicity
-        q0, m, hkl = peak_details(np.max(self.q_range), material)
+        q0, m, hkl = peak_details(np.max(self.q), material)
         self.q0[material], self.hkl[material] = q0, hkl
 
         # Intensity factors
@@ -130,6 +164,7 @@ class Peaks(object):
 
     def intensity(self, x_axis='q', background=0.01, strain_tensor=(0, 0, 0),
                   phi=0):
+        ### Need option for multiple phi! i.e. phi = np.linspace(0, np.pi, 23)
         """ Computes normalised intensity against 'q' or 'energy' / '2theta'.
 
         Specify the strain tensor (e_xx, e_yy, e_xy) for strained diffraction
@@ -150,16 +185,22 @@ class Peaks(object):
         error = "Can't plot wrt. {} in {} mode".format(x_axis, self.method)
         assert x_axis in valid, error
 
+        # add changes here
+        # if phi is None and self.phi.ndims == 1:
+        # phi = self.phi
+        # else phi = 0
+        # need to convert q  for energy!
+
         # Calculate the normal strain wrt. phi for each pixel
         e_xx, e_yy, e_xy = strain_tensor
         strain = strain_trans(e_xx, e_yy, e_xy, phi)
-        print('here')
         i = {}
         for mat in self.q0:
             q0, a, sigma = self.q0[mat], self.a[mat],  self.sigma[mat]
-            i[mat] = strained_gaussians(self.q_range, a, q0, sigma, strain)
 
-        print('here')
+
+            i[mat] = strained_gaussians(self.q, a, q0, sigma, strain)
+
         i_total = np.sum([i[mat] for mat in i], axis=0)
         background *= np.random.rand(*i_total.shape) * np.max(i_total)
         i['total'] = i_total + background
@@ -167,7 +208,7 @@ class Peaks(object):
         for material in i:
             i[material] /= np.max(i_total + background)
 
-        x = self.q_range if x_axis == 'q' else self.convert(self.q_range)
+        x = self.q if x_axis == 'q' else self.convert(self.q)
         return x, i
 
     def plot_intensity(self, x_axis='q', plot_type='all', exclude_labels=0.02,
@@ -227,51 +268,14 @@ class Peaks(object):
         plt.show()
 
 
-class MonoDetector(Peaks):
-    def __init__(self, detector_shape=(2000, 2000), pixel_size=0.2,
-                 sample_to_detector=1000, energy=100, delta_energy=0.5):
-        """ Instantiates a new x-ray diffraction setup (monochromatic beam).
+class Rings(Peaks):
 
-        Basic monochromatic detector with complete setup defined through
-        the sample to detector and energy parameters. The uncertainty in
-        beam energy will be used to define peaks widths.
-
-        Args:
-            detector_shape (tuple): Detector dimensions (x, y) in pixels
-            pixel_size (float): Pixel size (mm)
-            sample_to_detector: Sample to detector distance (mm)
-            energy: Beam energy (keV)
-            delta_energy: Energy resolution/divergence (keV)
-        """
-        self.detector = BaseDetector(detector_shape, pixel_size)
-        self.detector.setup(energy, sample_to_detector)
-        r_max, q_max = np.max(self.detector.r), np.max(self.detector.q)
-
-        self.energy = energy
-        self.sigma_q = lambda q: e_to_q(delta_energy, q_to_tth(q, self.energy))
-        self.q_range = np.linspace(0, q_max, int(r_max))
-        self.two_theta = q_to_tth(self.q_range, self.energy)
-        self.q0, self.hkl = {}, {}
-        self.a, self.sigma = {}, {}
-        self.materials = {}
-        self.convert = lambda x: q_to_tth(x, self.energy) * 180 / np.pi
-        self.method = 'mono'
-
-    def new_setup(self, energy, sample_detector):
-        """ Resets the experimental setup and re-computes peak parameters.
-
-        Args:
-            energy (float): Beam energy in keV
-            sample_detector (float): sample to detector distance (mm)
-        """
-        self.detector.setup(energy, sample_detector)
-        r_max, q_max = np.max(self.detector.r), np.max(self.detector.q)
-        self.q_range = np.linspace(0, q_max, int(r_max))
-
-        for material in self.materials:
-            b = self.materials[material]['b']
-            weight = self.materials[material]['weight']
-            self.add_peaks(material, b, weight)
+    def __init__(self, phi, q, a, q0, sigma):
+        self.phi = phi
+        self.q = q
+        self.a = a
+        self.q0 = q0
+        self.sigma = sigma
 
     def rings(self, exclude_criteria=0.01, crop=0.0, background=0.02,
               strain_tensor=(0., 0., 0.)):
@@ -294,11 +298,12 @@ class MonoDetector(Peaks):
         Returns:
             np.ndarray: 2D array scaled according to the maximum peak height.
         """
+
         # Extract data from detector object
-        crop = [int(crop * i / 2) for i in self.detector.shape]
+        crop = [int(crop * i / 2) for i in self.q.shape]
         crop = [None, None] if crop[0] == 0 else crop
-        phi = self.detector.phi[crop[0]:-crop[0], crop[1]:-crop[1]]
-        q = self.detector.q[crop[0]:-crop[0], crop[1]:-crop[1]]
+        phi = self.phi[crop[0]:-crop[0], crop[1]:-crop[1]]
+        q = self.q[crop[0]:-crop[0], crop[1]:-crop[1]]
 
         # Calculate the normal strain wrt. phi for each pixel
         e_xx, e_yy, e_xy = strain_tensor
@@ -320,7 +325,7 @@ class MonoDetector(Peaks):
 
         return img / np.nanmax(img)  # Rescale
 
-    def plot_rings(self, exclude_criteria=0.01, crop=0.,  background=0.02,
+    def plot_rings(self, exclude_criteria=0.01, crop=0., background=0.02,
                    strain_tensor=(0, 0, 0)):
         """ Plots an image array containing Debye-Scherrer rings.
 
@@ -341,46 +346,3 @@ class MonoDetector(Peaks):
         img = self.rings(exclude_criteria, crop, background, strain_tensor)
         plt.imshow(img)
         plt.show()
-
-
-class EnergyDetector(Peaks):
-
-    def __init__(self, two_theta=np.pi*(1/36), beamline='i12'):
-        """ Instantiates a new x-ray diffraction setup (energy dispersive).
-
-        Basic energy dispersive detector with complete experimental setup
-        defined via the diffracted angle (two theta). The beamline parameters -
-        energy vs. flux and energy resolution are read in by specifying a
-        known beamline(currently only DLS i12)
-
-        Args:
-            two_theta (float): Diffracted angle (rad)
-            beamline (str): Specified beamline (currently only 'i12' available)
-        """
-        self.two_theta = two_theta
-        self.energy = edxd_info[beamline]['energy']
-
-        e_res = edxd_info[beamline]['res_e']
-        delta_e = [e * d for e, d in zip(e_res['energy'], e_res['delta'])]
-        q_res = [[e_to_q(e, two_theta) for e in e_res['energy']],
-                 [e_to_q(d, two_theta) for d in delta_e]]
-        self.sigma_q = InterpolatedUnivariateSpline(*q_res, k=1, ext=3)
-
-        q = e_to_q(self.energy, two_theta)
-        flux = edxd_info[beamline]['flux']
-        self.flux_q = InterpolatedUnivariateSpline(q, flux, k=1, ext=3)
-        self.q_range = np.linspace(0, np.max(q), edxd_info[beamline]['bins'])
-        self.q0, self.q_res, self.hkl = {}, {}, {}
-        self.a, self.sigma = {}, {}
-        self.materials = {}
-        self.convert = lambda x: q_to_e(x, self.two_theta)
-        self.method = 'edxd'
-
-
-if __name__ == '__main__':
-    test = MonoDetector(detector_shape=(2000, 2000), pixel_size=0.2,
-                        energy=100, delta_energy=1, sample_to_detector=1000)
-    test.add_peaks('Al')
-    test.add_peaks('Fe')
-    test.plot_intensity(x_axis='2theta', exclude_labels=0.05, background=0.02)
-    test.plot_rings(0.02, 0.2, strain_tensor=(0.2, 0.1, 0.05))
