@@ -21,17 +21,17 @@ Example Usage
 ```python
 >> mono.intensity_factors('Fe', plot=True)
 ```
-
+![ScreenShot](xrdpb/data/intensity_factors.png)
 ```python
 >> mono.add_peaks('Fe', weight=0.8)
 >> mono.add_peaks('Cu', weight=0.2)
 >> mono.plot_intensity()
 ```
-
+![ScreenShot](xrdpb/data/peaks.png)
 ```python
 >> mono.plot_rings(strain_tensor=(0.2, 0.2, 0.05)
 ```
-
+![ScreenShot](xrdpb/data/rings.png)
 Requirements
 ------------
 
