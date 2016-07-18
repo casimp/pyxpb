@@ -3,26 +3,13 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import os
+
 import numpy as np
 
-from patterns.conversions import tth_to_q, q_to_tth, e_to_q, q_to_e
+from xrpd.conversions import tth_to_q, e_to_q
 from scipy.interpolate import InterpolatedUnivariateSpline, interp1d
-from patterns.peaks import Peaks, Rings
-
-
-# fname = os.path.join(os.path.dirname(__file__), 'data/i12_energy_distribution.csv')
-# i12_e_flux = np.loadtxt(fname, delimiter=',')
-#
-#
-# i12 = {'energy': i12_e_flux[:, 0],
-#        'flux': i12_e_flux[:, 1],
-#        'res_e': {'energy': [50, 150],
-#                  'delta': [0.5 * 0.007, 0.5 * 0.004]},
-#        'bins': 4000}
-#
-# edxd_info = {'i12': i12, 'id15': i12}
-#
-# energy_i12 = BaseEnergyDetector()
+from xrpd.peaks import Peaks, Rings
 
 
 class EnergyDetector(Peaks):
@@ -41,7 +28,7 @@ class EnergyDetector(Peaks):
             phi (np.ndarray): Angle for each of the detectors in detector array
             two theta (float): Slit angle (rad)
             energy_bins (np.ndarray): Energy bins (keV)
-            energy_flux (tuple): Tuple containing energy v flux measurements
+            energy_v_flux (tuple): Tuple containing energy v flux measurements
             energy_sigma (float, tuple): Energy resolution of detector or
                                          tuple with energy v resolution
         """
@@ -109,6 +96,11 @@ class MonoDetector(Rings):
         self.a, self.sigma, self.q0 = {}, {}, {}
         self.materials, self.hkl = {}, {}
 
+filename = os.path.join(os.path.dirname(__file__), 'data/i12_flux.csv')
+i12_flux = np.loadtxt(filename, delimiter=',')
 
-
-
+i12_energy = EnergyDetector(phi=np.linspace(-np.pi, 0, 23),
+                            two_theta=np.pi * (5 / 180),
+                            energy_bins=np.linspace(0, 200, 4000),
+                            energy_v_flux=(i12_flux[:, 0], i12_flux[:, 1]),
+                            energy_sigma=([50, 150], [0.5*0.007, 0.5*0.004]))
