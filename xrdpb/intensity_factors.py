@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 import os
 
-
 fname = os.path.join(os.path.dirname(__file__), 'data/form_factor.csv')
 df = pd.read_csv(fname, index_col=0)
 

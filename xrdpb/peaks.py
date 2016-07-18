@@ -224,8 +224,17 @@ class Peaks(object):
             phi = self.phi
 
         # To allow for list of phi values, must be column vector
-        if np.array(phi).ndim < 2:
-            phi = np.expand_dims(phi, 1)
+        phi = np.expand_dims(phi, 1) if np.array(phi).ndim < 2 else phi
+
+        # if mono
+        if self.method == 'mono':
+            x, y = self.q.shape[0] / 2, self.q.shape[1] / 2
+            bins = (x ** 2 + y ** 2) ** .5
+            q = np.linspace(0, self.q.max(), bins)
+        else:
+            q = self.q
+
+        print(phi.shape)
 
         # Calculate the normal strain wrt. phi for each pixel
         e_xx, e_yy, e_xy = strain_tensor
@@ -234,7 +243,8 @@ class Peaks(object):
         for mat in self.q0:
             q0, a, sigma = self.q0[mat], self.a[mat],  self.sigma[mat]
             # q = np.repeat(self.q, np.array(strain).size, axis=0) ##!!!??
-            i[mat] = strained_gaussians(self.q, a, q0, sigma, strain)
+            print(q.shape, a.shape, q0.shape, sigma.shape, strain.shape)
+            i[mat] = strained_gaussians(q, a, q0, sigma, strain)
 
         i_total = np.sum([i[mat] for mat in i], axis=0)  # OK?
         background *= np.random.rand(*i_total.shape) * np.max(i_total)
@@ -243,10 +253,10 @@ class Peaks(object):
         for material in i:
             i[material] /= np.max(i_total + background)
 
-        x = self.q if x_axis == 'q' else self.convert(self.q)
+        x = q if x_axis == 'q' else self.convert(q)
         return x, i
 
-    def plot_intensity(self, phi=0, x_axis='q', background=0.02,
+    def plot_intensity(self, phi=0, x_axis='q', background=0.01,
                        strain_tensor=(0., 0., 0.), plot_type='all',
                        exclude_labels=0.02):
         """ Plot normalised intensities against 'q' or 'energy' / '2theta'.
@@ -349,10 +359,11 @@ class Rings(Peaks):
         """
 
         # Extract data from detector object
-        crop = [int(crop * i / 2) for i in self.q.shape]
-        crop = [None, None] if crop[0] == 0 else crop
-        phi = self.phi[crop[0]:-crop[0], crop[1]:-crop[1]]
-        q = self.q[crop[0]:-crop[0], crop[1]:-crop[1]]
+        crop = [[int(crop * i / 2), -int(crop * i / 2)] for i in self.q.shape]
+        crop = [[None, None], [None, None]] if crop[0][0] == 0 else crop
+
+        phi = self.phi[crop[0][0]:crop[0][1], crop[1][0]:crop[1][1]]
+        q = self.q[crop[0][0]:crop[0][1], crop[1][0]:crop[1][1]]
 
         # Calculate the normal strain wrt. phi for each pixel
         e_xx, e_yy, e_xy = strain_tensor
