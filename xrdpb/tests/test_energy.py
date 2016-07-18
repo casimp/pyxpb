@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+from mock import patch
 import numpy as np
 
 from xrdpb.detectors import i12_energy
@@ -24,6 +25,18 @@ def test_intensity_profiles():
 
     i12_energy.intensity([0, np.pi/7], background=0, x_axis='energy',
                    strain_tensor=(0., 0., 0.))
+
+
+def test_all_intensity():
+    # Should return data for all detectors in array
+    assert i12_energy.intensity()['Fe'].shape == (4000, 23)
+    # i12_energy.relative_heights()
+
+
+@patch("matplotlib.pyplot.show")
+def test_plot_intensity():
+    i12_energy.plot_intensity()
+    i12_energy.intensity_factors('Fe', plot=True)
 
 
 if __name__== '__main__':

@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+from mock import patch
 import numpy as np
 
 from xrdpb.detectors import MonoDetector
@@ -44,6 +45,16 @@ def test_equal_quadrants():
     error = 'Symmetrically opposite quadrants not equal!'
     assert np.allclose(top_left, np.rot90(bottom_right, 2)), error
     assert np.allclose(top_right, np.rot90(bottom_left, 2)), error
+
+@patch("matplotlib.pyplot.show")
+def test_plot_intensity():
+    mono.plot_intensity()
+    mono.intensity_factors('Fe', plot=True)
+
+
+@patch("matplotlib.pyplot.show")
+def test_plot_rings():
+    mono.plot_rings()
 
 
 if __name__== '__main__':
