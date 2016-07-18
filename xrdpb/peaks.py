@@ -234,16 +234,12 @@ class Peaks(object):
         else:
             q = self.q
 
-        print(phi.shape)
-
         # Calculate the normal strain wrt. phi for each pixel
         e_xx, e_yy, e_xy = strain_tensor
         strain = strain_trans(e_xx, e_yy, e_xy, phi)
         i = {}
         for mat in self.q0:
             q0, a, sigma = self.q0[mat], self.a[mat],  self.sigma[mat]
-            # q = np.repeat(self.q, np.array(strain).size, axis=0) ##!!!??
-            print(q.shape, a.shape, q0.shape, sigma.shape, strain.shape)
             i[mat] = strained_gaussians(q, a, q0, sigma, strain)
 
         i_total = np.sum([i[mat] for mat in i], axis=0)  # OK?
