@@ -79,9 +79,11 @@ class MonoDetector(Rings):
 
         #  Instantiate position array (r, phi, 2theta, q) for detector
         y, x = np.ogrid[:float(shape[0]), :float(shape[1])]
-        x, y = x - shape[0] / 2, y - shape[1] / 2
+        x, y = x - (shape[0] - 1) / 2, y - (shape[1] - 1) / 2
         r = (x ** 2 + y ** 2) ** .5
-        self.phi = np.arctan(y / x)
+        self.phi = np.arctan(y / x)# - np.arccos(x / r)  # np.arcsin(y / r)  # np.arctan(y / x)
+        self.phi[np.logical_and(x < 0, y > 0)] += np.pi
+        self.phi[np.logical_and(x < 0, y < 0)] -= np.pi
         self.two_theta = np.arctan(r * self.pixel_size / sample_detector)
         self.q = tth_to_q(self.two_theta, energy)
 
