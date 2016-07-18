@@ -24,7 +24,7 @@ def strained_gaussians(x, *p):
     """
     img = np.zeros_like(x)
     for i in range(p[0].size):
-        q0 = p[1][i] + p[1][i] * p[3]
+        q0 = p[1][i] * (1 + p[3]) # + p[1][i] * p[3]
         img = img + p[0][i] * np.exp(- (x - q0)**2 / (2. * p[2][i]**2))
     return img
 
@@ -103,7 +103,6 @@ class Peaks(object):
             for i_f, label in zip([flux, i_lp, i_sf, i_tf], labels):
                 if isinstance(i_f, int) or len(i_f) == 1:
                     i_f *= np.ones_like(q)
-                print(q.shape, i_f.shape)
                 plt.plot(q[ind], i_f[ind] / i_f[ind].max(), '-', label=label)
             total = i_sf ** 2 * i_lp * i_tf * flux
             total = total[ind]
@@ -162,19 +161,18 @@ class Peaks(object):
             a_rel[mat] = strained_gaussians(q0_, a_, q0_, sigma_, 0) / a_max
         return a_rel
 
-    def intensity(self, x_axis='q', background=0.01, strain_tensor=(0, 0, 0),
-                  phi=0):
-        ### Need option for multiple phi! i.e. phi = np.linspace(0, np.pi, 23)
+    def intensity(self, phi=None, x_axis='q', background=0.01,
+                  strain_tensor=(0, 0, 0)):
         """ Computes normalised intensity against 'q' or 'energy' / '2theta'.
 
         Specify the strain tensor (e_xx, e_yy, e_xy) for strained diffraction
         peaks at a given angle (phi).
 
         Args:
+            phi (float, list, np.ndarray): Azimuthal angle (rad)
             x_axis (str): Plot relative to 'q' or 'energy' / '2theta'
             background (float): Relative background noise
             strain_tensor (tuple): Strain tensor components (e_xx, e_yy, e_xy)
-            phi (float): Azimuthal angle (rad)
 
         Returns:
             x (np.ndarray): 1D positional array ('q' or 'energy' / '2theta')
@@ -185,11 +183,15 @@ class Peaks(object):
         error = "Can't plot wrt. {} in {} mode".format(x_axis, self.method)
         assert x_axis in valid, error
 
-        # add changes here
-        # if phi is None and self.phi.ndims == 1:
-        # phi = self.phi
-        # else phi = 0
-        # need to convert q  for energy!
+        # If no phi is defined, phi is set to self.phi for edxd, else error
+        if phi is None:
+            error = 'Must define azimuthal angle(s), phi, for mono detectors.'
+            assert self.method != 'mono', error
+            phi = self.phi
+
+        # To allow for list of phi values, must be column vector
+        if np.array(phi).ndim < 2:
+            phi = np.expand_dims(phi, 1)
 
         # Calculate the normal strain wrt. phi for each pixel
         e_xx, e_yy, e_xy = strain_tensor
@@ -197,11 +199,10 @@ class Peaks(object):
         i = {}
         for mat in self.q0:
             q0, a, sigma = self.q0[mat], self.a[mat],  self.sigma[mat]
-
-
+            # q = np.repeat(self.q, np.array(strain).size, axis=0) ##!!!??
             i[mat] = strained_gaussians(self.q, a, q0, sigma, strain)
 
-        i_total = np.sum([i[mat] for mat in i], axis=0)
+        i_total = np.sum([i[mat] for mat in i], axis=0)  # OK?
         background *= np.random.rand(*i_total.shape) * np.max(i_total)
         i['total'] = i_total + background
 
@@ -211,8 +212,9 @@ class Peaks(object):
         x = self.q if x_axis == 'q' else self.convert(self.q)
         return x, i
 
-    def plot_intensity(self, x_axis='q', plot_type='all', exclude_labels=0.02,
-                       background=0.02, strain_tensor=(0., 0., 0.), phi=0):
+    def plot_intensity(self, phi=0, x_axis='q', background=0.02,
+                       strain_tensor=(0., 0., 0.), plot_type='all',
+                       exclude_labels=0.02):
         """ Plot normalised intensities against 'q' or 'energy' / '2theta'.
 
         Specify the strain tensor (e_xx, e_yy, e_xy) for strained diffraction
@@ -223,14 +225,14 @@ class Peaks(object):
         Note: Background noise not used for 'separate' plots.
 
         Args:
+            phi (float): Azimuthal angle (rad)
             x_axis (str): Plot relative to 'q' or 'energy' / '2theta'
-            plot_type (str): Plot 'separate' intensities, 'total' or 'both'.
-            exclude_labels (float): Relative maxima for peak label exclusion
             background (float): Relative background noise
             strain_tensor (tuple): Strain tensor components (e_xx, e_yy, e_xy)
-            phi (float): Azimuthal angle (rad)
+            plot_type (str): Plot 'separate' intensities, 'total' or 'both'.
+            exclude_labels (float): Relative maxima for peak label exclusion
         """
-        x, i = self.intensity(x_axis, background, strain_tensor, phi)
+        x, i = self.intensity(phi, x_axis, background, strain_tensor)
         i_total = i.pop('total')
         i_total_noiseless = np.sum([i[mat] for mat in i], axis=0)
         noise_factor = np.max(i_total) / np.max(i_total_noiseless)

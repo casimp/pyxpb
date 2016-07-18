@@ -36,7 +36,7 @@ class EnergyDetector(Peaks):
         self.q = e_to_q(self.energy, two_theta)
 
         # Energy resolution wrt. energy (used to define FWHM)
-        if isinstance(energy_sigma(int, float)):
+        if isinstance(energy_sigma, (int, float)):
             self.sigma_q = interp1d([0, self.q.max()], [energy_sigma] * 2)
         else:
             q, sigma = e_to_q(energy_sigma[0], two_theta), energy_sigma[1]
