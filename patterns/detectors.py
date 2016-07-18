@@ -5,7 +5,6 @@ from __future__ import unicode_literals
 
 import numpy as np
 
-import matplotlib.pyplot as plt
 from patterns.conversions import tth_to_q, q_to_tth, e_to_q, q_to_e
 from scipy.interpolate import InterpolatedUnivariateSpline, interp1d
 from patterns.peaks import Peaks, Rings
@@ -29,6 +28,23 @@ from patterns.peaks import Peaks, Rings
 class EnergyDetector(Peaks):
     def __init__(self, phi, two_theta, energy_bins, energy_v_flux,
                  energy_sigma):
+        """ Creates instance of energy dispersive x-ray detector.
+
+        Creates EDXD detector (array) with associated detector parameters
+        (i.e. 2theta, flux distribution, energy and energy resolution).
+
+        Inherits from Peaks class, allowing for the calculation/estimation and
+        visualisation of intensity profiles for materials or combinations
+        of materials/phases.
+
+        Args:
+            phi (np.ndarray): Angle for each of the detectors in detector array
+            two theta (float): Slit angle (rad)
+            energy_bins (np.ndarray): Energy bins (keV)
+            energy_flux (tuple): Tuple containing energy v flux measurements
+            energy_sigma (float, tuple): Energy resolution of detector or
+                                         tuple with energy v resolution
+        """
         self.method = 'edxd'
         self.two_theta = two_theta
         self.phi = phi
@@ -50,13 +66,26 @@ class EnergyDetector(Peaks):
         self.a, self.sigma, self.q0 = {}, {}, {}
         self.materials, self.hkl = {}, {}
 
-    def convert(self, q):
-        return q_to_e(q, self.two_theta)
-
 
 class MonoDetector(Rings):
     def __init__(self, shape, pixel_size, sample_detector, energy,
                  energy_sigma):
+        """ Creates instance of monochromatic (area) XRD detector.
+
+        Creates XRD detector with correct geometry and experimental setup
+        (i.e. sample to detector distance, energy and energy resolution).
+
+        Inherits from Rings/Peaks classes, allowing for the
+        calculation/estimation and visualisation of intensity profiles and
+        Debye-Scherrer rings for materials or combinations of materials/phases.
+
+        Args:
+            shape (tuple): Detector shape (x, y) in pixels
+            pixel_size (float): Pixel size (mm)
+            sample_detector (float): Sample to detector distance (mm).
+            energy (float): X-ray energy (keV)
+            energy_sigma (float): Energy resolution (keV)
+        """
         self.method = 'mono'
         self.shape, self.pixel_size = shape, pixel_size
         self.energy, self.sample_detector = energy, sample_detector
@@ -64,9 +93,9 @@ class MonoDetector(Rings):
         #  Instantiate position array (r, phi, 2theta, q) for detector
         y, x = np.ogrid[:float(shape[0]), :float(shape[1])]
         x, y = x - shape[0] / 2, y - shape[1] / 2
-        self.r = (x ** 2 + y ** 2) ** .5
+        r = (x ** 2 + y ** 2) ** .5
         self.phi = np.arctan(y / x)
-        self.two_theta = np.arctan(self.r * self.pixel_size / sample_detector)
+        self.two_theta = np.arctan(r * self.pixel_size / sample_detector)
         self.q = tth_to_q(self.two_theta, energy)
 
         # Beam energy variation (used to define FWHM)
@@ -79,17 +108,6 @@ class MonoDetector(Rings):
         # Empty dicts for storing peaks / materials
         self.a, self.sigma, self.q0 = {}, {}, {}
         self.materials, self.hkl = {}, {}
-
-
-    #
-    # def change_setup(self, energy, sample_detector):
-    #     self.sample_detector = sample_detector
-    #     self.energy = energy
-    #     self.two_theta = np.arctan(self.r * self.pixel_size / sample_detector)
-    #     self.q = tth_to_q(self.two_theta, energy)
-
-    def convert(self, q):
-        return q_to_tth(q, self.energy) * 180 / np.pi
 
 
 

@@ -14,22 +14,42 @@ plt.style.use('ggplot')
 
 
 def strained_gaussians(x, *p):
-    """
-    Guassian curve fit for diffraction data.
+    """ Gaussian curve fit - accepts strain value(s) for peak shift.
 
-    #   Peak height above background : p[0]
-    #   Central value                : p[1]
-    #   Standard deviation           : p[2]
-    #   Strain                       : p[3]
+    Args:
+        x (np.ndarray): Position
+        p (tuple): Fitting parameters
+
+        p[0] (float, list, np.ndarray): Peak height(s)
+        p[1] (float, list, np.ndarray): Peak position(s)
+        p[2] (float, list, np.ndarray): Standard deviation(s)
+        p[3] (float, list, np.ndarray): Strain(s)
+
+    Returns:
+        1d/2d intensity array
     """
     img = np.zeros_like(x)
     for i in range(p[0].size):
-        q0 = p[1][i] * (1 + p[3]) # + p[1][i] * p[3]
+        q0 = p[1][i] * (1 + p[3])  # + p[1][i] * p[3]
         img = img + p[0][i] * np.exp(- (x - q0)**2 / (2. * p[2][i]**2))
     return img
 
 
 def strain_trans(e_xx, e_yy, e_xy, phi):
+    """ Strain transformation, based on strain tensor plus az. angle (phi).
+
+    Calculates the normal strain for the given strain tensor and angle or list/
+    array of angles (phi)
+
+    Args:
+        e_xx (float): Strain tensor component.
+        e_yy (float): Strain tensor component.
+        e_xy (float): Strain tensor component.
+        phi (float, np.ndarray): Azimuthal angles(s)
+
+    Returns:
+        1d/2d strain array
+    """
     e_xx_1 = ((((e_xx + e_yy) / 2) + ((e_xx - e_yy) * np.cos(2 * phi) / 2)) +
               (e_xy * np.sin(2 * phi)))
     return e_xx_1
@@ -41,8 +61,21 @@ class Peaks(object):
                   '2theta': r'$2\theta$',
                   'energy': 'Energy (keV)'}
 
-    def __init__(self, r, q, energy, two_theta, phi, sigma_q, flux_q, method):
+    def __init__(self, q, energy, two_theta, phi, sigma_q, flux_q, method):
+        """ XRD peak calculation for defined XRD setup.
 
+        Parent class requiring the definition of all diffraction parameters.
+        Recommended to use MonoDetector or Energy Detector child classes.
+
+        Args:
+            q (np.ndarray): 1D or 2D array of q values
+            energy (float, np.ndarray): Energy (mono) or energy bins (energy)
+            two_theta (np.ndarray): 2D 2theta array (mono) or 2theta value
+            phi (tuple): 1D (energy) or 2D (mono) array of az. angles
+            sigma_q (interp1d): Sigma wrt. q
+            flux_q (interp1d): Flux wrt. q
+            method (str): Either 'mono' or 'energy'
+        """
         self.method = method
         self.two_theta = two_theta
         self.phi = phi
@@ -50,7 +83,6 @@ class Peaks(object):
         self.q = q
         self.sigma_q = sigma_q
         self.flux_q = flux_q
-        self.r = r
 
         # Empty dicts for storing peaks / materials
         self.a, self.sigma, self.q0 = {}, {}, {}
@@ -58,9 +90,9 @@ class Peaks(object):
 
     def convert(self, q):
         if self.method == 'mono':
-            return q_to_tth(self.q, self.energy) * 180 / np.pi
+            return q_to_tth(q, self.energy) * 180 / np.pi
         else:
-            return q_to_e(self.q, self.two_theta)
+            return q_to_e(q, self.two_theta)
 
     def intensity_factors(self, material, b=1, q=None, plot=True, x_axis='q'):
         """ Calculates normalised intensity factors (with option for plotting).
@@ -86,27 +118,29 @@ class Peaks(object):
         method = self.method
 
         if q is None and method == 'mono':
-            q = np.linspace(0, self.q.max(), self.r.max())
+            x, y = self.q.shape[0] / 2, self.q.shape[1] / 2
+            bins = (x ** 2 + y ** 2) ** .5
+            q = np.linspace(0, self.q.max(), bins)
         else:
             q = self.q if q is None else q
         # Intensity factors
 
-        i_lp = lp_factor(q_to_tth(q, self.energy)) if method == 'mono' else 1
+        if method == 'mono':
+            i_lp = lp_factor(q_to_tth(q, self.energy))
+        else:
+            i_lp = np.ones_like(q)
         i_sf = scattering_factor(material, q)  # consider adding complex
         i_tf = temperature_factor(q, b)
-        flux = self.flux_q(q) if method == 'edxd' else 1
+        flux = self.flux_q(q)# if method == 'edxd' else 1
 
         if plot:
             ind = np.argsort(q)[q > 2]
             q = q if x_axis == 'q' else self.convert(q)
             labels = ['flux', 'lorentz', 'scatter', 'temp']
             for i_f, label in zip([flux, i_lp, i_sf, i_tf], labels):
-                if isinstance(i_f, int) or len(i_f) == 1:
-                    i_f *= np.ones_like(q)
                 plt.plot(q[ind], i_f[ind] / i_f[ind].max(), '-', label=label)
-            total = i_sf ** 2 * i_lp * i_tf * flux
-            total = total[ind]
-            plt.plot(q[ind], total / total.max(), 'k-.', label='total')
+            total = (i_sf[ind] ** 2) * i_lp[ind] * i_tf[ind] * flux[ind]
+            plt.plot(q[ind], total / np.max(total), 'k-.', label='total')
             plt.ylim([0, 1.05])
             legend = plt.legend()
             legend.get_frame().set_color('white')
@@ -272,7 +306,20 @@ class Peaks(object):
 
 class Rings(Peaks):
 
-    def __init__(self, phi, q, a, q0, sigma):
+    def __init__(self, q, phi, a, q0, sigma):
+        """ Debye-Scherrer ring calculation and visulisation.
+
+        Allows for the calculation of 2D intensity arrays (and vizulisation
+        of the associated images). Recommended to use MonoDetector child class
+        to define detector and calculate peaks parameters.
+
+        Args:
+            q (np.ndarray): 1D or 2D array of q values
+            phi (tuple): 1D (energy) or 2D (mono) array of az. angles
+            a (dict): Peaks(s) height wrt. material
+            q0 (dict): Peak(s) position wrt. material
+            sigma (dict): Peak(s) standard deviation wrt. material
+        """
         self.phi = phi
         self.q = q
         self.a = a
