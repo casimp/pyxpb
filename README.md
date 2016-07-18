@@ -1,13 +1,13 @@
-pyXe-patterns: XRD Diffraction Pattern Builder
+xrdpb: XRD Diffraction Pattern Builder
 ==============================================
 
-What is pyXe-patterns?
+What is xrdpb?
 ----------------------
 
 Requirements
 ------------
 
-pyXe-patterns is built on Python’s scientific stack (numpy, scipy, matplotlib). Testing and development were carried out using the Anaconda (v 2.5.0) package manager, which built with the following versions:
+xrdpb is built on Python’s scientific stack (numpy, scipy, matplotlib). Testing and development were carried out using the Anaconda (v 2.5.0) package manager, which built with the following versions:
 
 -	Python: version 2.7.11 and 3.5.1
 -	numpy: version 1.10.4
@@ -17,17 +17,9 @@ pyXe-patterns is built on Python’s scientific stack (numpy, scipy, matplotlib)
 Installation
 ------------
 
-Installing pyXe-patterns is easily done using pip. Assuming it is installed, just run the following from the command-line:
+You can install from the distribution using the setup.py script. The source is stored in the GitHub repo, which can be browsed at:
 
-```
-pip install pyxe-patterns
-```
-
-This command will download the latest version of pyXe-patterns from the Python Package Index and install it to your system.
-
-Alternatively, you can install from the distribution using the setup.py script. The source is stored in the GitHub repo, which can be browsed at:
-
-https://github.com/casimp/pyxe-patterns
+https://github.com/casimp/xrdpb
 
 Simply download and unpack, then navigate to the download directory and run the following from the command-line:
 
