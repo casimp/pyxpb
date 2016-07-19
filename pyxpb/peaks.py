@@ -30,7 +30,7 @@ def strained_gaussians(x, *p):
     """
     img = np.zeros_like(x)
     for i in range(p[0].size):
-        q0 = p[1][i] * (1 + p[3])  # + p[1][i] * p[3]
+        q0 = p[1][i] * (1 - p[3])  # + p[1][i] * p[3]
         img = img + p[0][i] * np.exp(- (x - q0)**2 / (2. * p[2][i]**2))
     return img
 
