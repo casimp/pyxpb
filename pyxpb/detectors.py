@@ -7,9 +7,9 @@ import os
 
 import numpy as np
 
-from xrdpb.conversions import tth_to_q, e_to_q
+from pyxpb.conversions import tth_to_q, e_to_q
 from scipy.interpolate import InterpolatedUnivariateSpline, interp1d
-from xrdpb.peaks import Peaks, Rings
+from pyxpb.peaks import Peaks, Rings
 
 
 class EnergyDetector(Peaks):

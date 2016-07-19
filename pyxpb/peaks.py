@@ -6,9 +6,9 @@ from __future__ import unicode_literals
 import matplotlib.pyplot as plt
 import numpy as np
 
-from xrdpb.multiplicity import peak_details
-from xrdpb.conversions import q_to_tth, q_to_e
-from xrdpb.intensity_factors import scattering_factor, temp_factor, lp_factor
+from pyxpb.multiplicity import peak_details
+from pyxpb.conversions import q_to_tth, q_to_e
+from pyxpb.intensity_factors import scattering_factor, temp_factor, lp_factor
 
 plt.style.use('ggplot')
 
