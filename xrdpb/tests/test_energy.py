@@ -29,15 +29,16 @@ def test_intensity_profiles():
 
 def test_all_intensity():
     # Should return data for all detectors in array
-    assert i12_energy.intensity()['Fe'].shape == (4000, 23)
-    # i12_energy.relative_heights()
+    error = i12_energy.intensity()[1]['Fe'].shape
+    assert i12_energy.intensity()[1]['Fe'].shape == (23, 4000), error
 
 
 @patch("matplotlib.pyplot.show")
-def test_plot_intensity():
+def test_plot_intensity(mock_show):
+    mock_show.return_value = None
     i12_energy.plot_intensity()
     i12_energy.intensity_factors('Fe', plot=True)
 
 
-if __name__== '__main__':
-    test_intensity_profiles()
+if __name__ == '__main__':
+    test_plot_intensity()

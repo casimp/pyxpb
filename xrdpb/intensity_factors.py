@@ -31,12 +31,12 @@ def scattering_factor(element, q):
     return i_sf
 
 
-def scattering_factor_complex(elements, q):
-    """
-    Atomic scattering for polyvalent materials.
-    * More difficult to implement *
-    """
-    pass
+# def scattering_factor_complex(elements, q):
+#     """
+#     Atomic scattering for polyvalent materials.
+#     * More difficult to implement *
+#     """
+#     pass
 
 
 def temp_factor(q, b=1):

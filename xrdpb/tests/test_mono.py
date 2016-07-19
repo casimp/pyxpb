@@ -47,13 +47,15 @@ def test_equal_quadrants():
     assert np.allclose(top_right, np.rot90(bottom_left, 2)), error
 
 @patch("matplotlib.pyplot.show")
-def test_plot_intensity():
+def test_plot_intensity(mock_show):
+    mock_show.return_value = None
     mono.plot_intensity()
     mono.intensity_factors('Fe', plot=True)
 
 
 @patch("matplotlib.pyplot.show")
-def test_plot_rings():
+def test_plot_rings(mock_show):
+    mock_show.return_value = None
     mono.plot_rings()
 
 
