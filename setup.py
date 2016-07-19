@@ -10,6 +10,7 @@ setup(
     author='C. Simpson',
     author_email='c.a.simpson01@gmail.com',
     packages=['xrdpb'],
+    include_package_data = True,
     url='https://github.com/casimp/xrdpb',
     download_url = 'https://github.com/casimp/xrdpb/tarball/v0.1.0',
     license='LICENSE.txt',
