@@ -1,1 +1,1 @@
-recursive-include xrdpb/data *.csv
+recursive-include pyxpb/data *.csv
