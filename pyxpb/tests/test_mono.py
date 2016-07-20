@@ -6,7 +6,7 @@ from __future__ import unicode_literals
 from mock import patch
 import numpy as np
 
-from xrdpb.detectors import MonoDetector
+from pyxpb.detectors import MonoDetector
 
 mono = MonoDetector(shape=(2000, 2000), pixel_size=0.2,
                     sample_detector=700, energy=100,

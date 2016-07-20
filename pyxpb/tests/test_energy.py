@@ -6,7 +6,7 @@ from __future__ import unicode_literals
 from mock import patch
 import numpy as np
 
-from xrdpb.detectors import i12_energy
+from pyxpb.detectors import i12_energy
 
 i12_energy.add_peaks('Fe')
 
