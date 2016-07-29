@@ -127,4 +127,4 @@ def peak_details(q_max, material=None, a=None, structure=None):
     hkl, M = cubic_multiplicity(structure, N_max)
     q0 = np.array([reciprocal_spacings(i[0], i[1], i[2], a) for i in hkl])
     miller_names = np.array(['{}{}{}'.format(i[0], i[1], i[2]) for i in hkl])
-    return q0, np.array(M), miller_names
+    return a, q0, np.array(M), miller_names

@@ -3,6 +3,8 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+from collections import OrderedDict
+
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -86,7 +88,7 @@ class Peaks(object):
 
         # Empty dicts for storing peaks / materials
         self.a, self.sigma, self.q0 = {}, {}, {}
-        self.materials, self.hkl = {}, {}
+        self.materials, self.hkl = OrderedDict(), {}
 
     def convert(self, q):
         if self.method == 'mono':
@@ -162,11 +164,8 @@ class Peaks(object):
             b (float): B factor
             weight (float): Relative peak weight (useful for mixtures/phases)
         """
-        # Store material, b factor and weight for recalculation
-        self.materials[material] = {'b': b, 'weight': weight}
-
         # Find peaks and multiplicity
-        q0, m, hkl = peak_details(np.max(self.q), material)
+        a, q0, m, hkl = peak_details(np.max(self.q), material)
         self.q0[material], self.hkl[material] = q0, hkl
 
         # Intensity factors
@@ -178,6 +177,9 @@ class Peaks(object):
         self.sigma[material] = sigma
         peak_height = integrated_intensity / (sigma * (2 * np.pi) ** 0.5)
         self.a[material] = peak_height
+
+        # Store material, b factor and weight for recalculation
+        self.materials[material] = {'a': a, 'b': b, 'weight': weight}
 
     def relative_heights(self):
         """ Computes relative peak heights wrt. total intensity profile.
