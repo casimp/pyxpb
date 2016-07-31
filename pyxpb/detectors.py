@@ -150,9 +150,10 @@ def fwhm_energy(e_res, ttheta, alpha):
 #     return p * np.sqrt((2 * d_e / energy) ** 2 + (2 * alpha / np.tan(ttheta)) ** 2) * energy
 
 
-i12_energy = EnergyDetector(phi=np.linspace(-np.pi, 0, 23),
-                            two_theta=np.pi * (5 / 180),
-                            energy_bins=np.linspace(0, 180.5, 4096),
-                            energy_v_flux=(i12_flux[:, 0], i12_flux[:, 1]),
-                            gauge_param=(0.15, 0.25, 1455, 553, 0, np.pi/36),
-                            energy_res=([50, 150], [0.5*0.007, 0.5*0.004]))
+def i12_energy():
+    return EnergyDetector(phi=np.linspace(-np.pi, 0, 23),
+                          two_theta=np.pi * (5 / 180),
+                          energy_bins=np.linspace(0, 180.5, 4096),
+                          energy_v_flux=(i12_flux[:, 0], i12_flux[:, 1]),
+                          gauge_param=(0.15, 0.25, 1455, 553, 0, np.pi/36),
+                          energy_res=([50, 150], [0.5*0.007, 0.5*0.004]))
