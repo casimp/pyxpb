@@ -30,8 +30,10 @@ class EnergyDetector(Peaks):
             two theta (float): Slit angle (rad)
             energy_bins (np.ndarray): Energy bins (keV)
             energy_v_flux (tuple): Tuple containing energy v flux measurements
-            energy_sigma (float, tuple): Energy resolution of detector or
-                                         tuple with energy v resolution
+            gauge_param (tuple): Tuple containing gauge param (a, b, c, e and
+                                 h from Knowles et al.)
+            energy_res (float, tuple): Energy resolution of detector or
+                                       tuple with energy v resolution
         """
         self.method = 'edxd'
         self.two_theta = two_theta
@@ -104,9 +106,6 @@ class MonoDetector(Rings):
         self.a, self.sigma, self.q0 = {}, {}, {}
         self.materials, self.hkl = {}, {}
 
-filename = os.path.join(os.path.dirname(__file__), 'data/i12_flux.csv')
-i12_flux = np.loadtxt(filename, delimiter=',')
-
 
 def energy_gauge(a, b, c, e, h, ttheta, plot=True):
     """ As per Rowles, M (2011) - parallel model. """
@@ -140,14 +139,8 @@ def fwhm_energy(e_res, ttheta, alpha):
     return fwhm
 
 
-# def i12_fwhm_b(energy, p=1):
-#     C = 4 * np.pi / 1e10
-#     ttheta = np.pi * 5 / 180
-#     alpha = i12_gauge(0, False)[1]
-#     d_e = i12_e_res(energy)
-#     print((alpha / np.tan(ttheta)))
-#     #return p * np.sqrt((2 * d_e / energy)**2 + (2.354**2)*(0.13*2.960/(energy*1000)) + (2 * alpha / np.tan(ttheta))**2) * energy
-#     return p * np.sqrt((2 * d_e / energy) ** 2 + (2 * alpha / np.tan(ttheta)) ** 2) * energy
+filename = os.path.join(os.path.dirname(__file__), 'data/i12_flux.csv')
+i12_flux = np.loadtxt(filename, delimiter=',')
 
 
 def i12_energy():
@@ -157,3 +150,12 @@ def i12_energy():
                           energy_v_flux=(i12_flux[:, 0], i12_flux[:, 1]),
                           gauge_param=(0.15, 0.25, 1455, 553, 0, np.pi/36),
                           energy_res=([50, 150], [0.5*0.007, 0.5*0.004]))
+
+# def i12_fwhm_b(energy, p=1):
+#     C = 4 * np.pi / 1e10
+#     ttheta = np.pi * 5 / 180
+#     alpha = i12_gauge(0, False)[1]
+#     d_e = i12_e_res(energy)
+#     print((alpha / np.tan(ttheta)))
+#     #return p * np.sqrt((2 * d_e / energy)**2 + (2.354**2)*(0.13*2.960/(energy*1000)) + (2 * alpha / np.tan(ttheta))**2) * energy
+#     return p * np.sqrt((2 * d_e / energy) ** 2 + (2 * alpha / np.tan(ttheta)) ** 2) * energy
