@@ -6,6 +6,7 @@ from __future__ import unicode_literals
 import os
 
 import numpy as np
+from numpy.polynomial.chebyshev import chebfit, chebval
 import matplotlib.pyplot as plt
 
 from pyxpb.conversions import tth_to_q, e_to_q, e_to_w, q_to_e
@@ -42,7 +43,7 @@ class EnergyDetector(Peaks):
         self.q = e_to_q(self.energy, two_theta)
 
         # Error in angle (alpha)
-        alpha = energy_gauge(*gauge_param, False)[1]
+        alpha = energy_gauge(*(gauge_param + (False, )))[1]
 
         # Energy resolution wrt. energy (used to define FWHM)
         if isinstance(energy_res, (int, float)):
@@ -60,7 +61,27 @@ class EnergyDetector(Peaks):
         # Empty dicts for storing peaks / materials
         self.a, self.sigma, self.q0 = {}, {}, {}
         self.materials, self.hkl = {}, {}
+        self.background = 0
 
+    def define_background(self, q, I, k):
+        """ Background profile - q, I points with Chebdev poly fit.
+
+        Can supply 2d arrays for q and I, which define the background
+        intensity as a function of azimuthal position.
+
+        Args:
+            q (list, ndarray): Detector shape (x, y) in pixels
+            I (list, ndarray): Pixel size (mm)
+            k (int): Chebdev polynomial degree of fit.
+        """
+
+        # if just 1 - apply to all
+        # else assert same as slices/detectors
+        # fit per detector
+        # store
+        f = np.zeros((self.q.shape[0], k + 1))
+        f = chebfit(q, I, k)
+        self.background = f
 
 class MonoDetector(Rings):
     def __init__(self, shape, pixel_size, sample_detector, energy,
@@ -105,6 +126,19 @@ class MonoDetector(Rings):
         # Empty dicts for storing peaks / materials
         self.a, self.sigma, self.q0 = {}, {}, {}
         self.materials, self.hkl = {}, {}
+        self.background = 0
+
+    def define_background(self, q, I, k):
+        """ Background profile - q, I points with Chebdev poly fit.
+
+        Args:
+            q (list, ndarray): Detector shape (x, y) in pixels
+            I (list, ndarray): Pixel size (mm)
+            k (int): Chebdev polynomial degree of fit.
+        """
+        f = np.zeros((self.q.shape[0], k + 1))
+        f = chebfit(q, I, k)
+        self.background = f
 
 
 def energy_gauge(a, b, c, e, h, ttheta, plot=True):
