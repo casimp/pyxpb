@@ -7,6 +7,7 @@ from collections import OrderedDict
 
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy.polynomial.chebyshev import chebval, chebfit
 
 from pyxpb.multiplicity import peak_details
 from pyxpb.conversions import q_to_tth, q_to_e
@@ -85,12 +86,21 @@ class Peaks(object):
         self.q = q
         self.sigma_q = sigma_q
         self.flux_q = flux_q
+        self.background = np.ones(1)
 
         # Empty dicts for storing peaks / materials
         self.a, self.sigma, self.q0 = {}, {}, {}
         self.materials, self.hkl = OrderedDict(), {}
 
-    def convert(self, q):
+    def _convert(self, q):
+        """ Helper function to convert q to 2theta (mono) or energy (edxd).
+
+        Args:
+            q (float, ndarray): q in A^-1
+
+        Returns:
+            float, ndarray: Energy (keV) or 2theta (rad)
+        """
         if self.method == 'mono':
             return q_to_tth(q, self.energy) * 180 / np.pi
         else:
@@ -133,11 +143,11 @@ class Peaks(object):
             i_lp = np.ones_like(q)
         i_sf = scattering_factor(material, q)  # consider adding complex
         i_tf = temp_factor(q, b)
-        flux = self.flux_q(q)# if method == 'edxd' else 1
+        flux = self.flux_q(q)
 
         if plot:
             ind = np.argsort(q)[q > 2]
-            q = q if x_axis == 'q' else self.convert(q)
+            q = q if x_axis == 'q' else self._convert(q)
             labels = ['flux', 'lorentz', 'scatter', 'temp']
             for i_f, label in zip([flux, i_lp, i_sf, i_tf], labels):
                 plt.plot(q[ind], i_f[ind] / i_f[ind].max(), '-', label=label)
@@ -152,7 +162,7 @@ class Peaks(object):
         else:
             return i_lp, i_sf, i_tf, flux
 
-    def add_peaks(self, material, b=1., weight=1.):
+    def add_material(self, material, b=1., weight=1.):
         """ Add peak locations and intensities for a given material.
 
         Find peaks and relative intensities based on material and Debye-Waller
@@ -180,6 +190,41 @@ class Peaks(object):
 
         # Store material, b factor and weight for recalculation
         self.materials[material] = {'a': a, 'b': b, 'weight': weight}
+
+
+    def define_background(self, q, I, k, plot=False, az_idx=0):
+        """ Background profile - q, I points with Chebdev poly fit.
+
+        Can supply 2d array for q and I, which define the background
+        intensity as a function of azimuthal position. This is predominantly
+        for use with the pyxe package!
+
+        Args:
+            q (ndarray): 1d or 2d array with q positions
+            I (ndarray): 1d or 2d array with intensity values
+            k (int): Order for Cheyshev polynomial
+            plot (bool): True/False
+            az_idx (int): Azimuthal slice to plot
+        """
+        # Calculate fit and apply to all slices
+        if np.array(q).ndim == 1:
+            f = chebfit(q, I, k)
+        # Calculate fit for each slice
+        else:
+            assert self.phi.size == q.shape[0]
+            f = np.zeros((self.q.shape[0], k + 1))
+
+            for az in range(q.shape[0]):
+                finite = np.isfinite(q[az])
+                f[az] = chebfit(q[az][finite], I[az][finite], k)
+
+        if plot:
+            plt.plot(self.q, chebval(self.q, f[az_idx]), 'k-')
+            x = q[az_idx] if q.ndim == 2 else q
+            y = I[az_idx] if q.ndim == 2 else I
+            plt.plot(x, y, 'r+')
+            plt.show()
+        self.background = f
 
     def relative_heights(self):
         """ Computes relative peak heights wrt. total intensity profile.
@@ -245,17 +290,23 @@ class Peaks(object):
             i[mat] = strained_gaussians(q, a, q0, sigma, strain)
 
         i_total = np.sum([i[mat] for mat in i], axis=0)  # OK?
-        background *= np.random.rand(*i_total.shape) * np.max(i_total)
+
+        if self.background.ndim == 1:
+            back = chebval(q, self.background)
+        else:
+            back = chebval(q, self.background[0])
+        background *= np.max(i_total) * back / np.max(back)
+
         i['total'] = i_total + background
 
         for material in i:
             i[material] /= np.max(i_total + background)
 
-        x = q if x_axis == 'q' else self.convert(q)
+        x = q if x_axis == 'q' else self._convert(q)
         return x, i
 
-    def plot_intensity(self, phi=0, x_axis='q', background=0.01,
-                       strain_tensor=(0., 0., 0.), plot_type='all',
+    def plot_intensity(self, phi=0, x_axis='q', background=0.,
+                       strain_tensor=(0., 0., 0.), plot_type='simple',
                        exclude_labels=0.02):
         """ Plot normalised intensities against 'q' or 'energy' / '2theta'.
 
@@ -271,7 +322,7 @@ class Peaks(object):
             x_axis (str): Plot relative to 'q' or 'energy' / '2theta'
             background (float): Relative background noise
             strain_tensor (tuple): Strain tensor components (e_xx, e_yy, e_xy)
-            plot_type (str): Plot 'separate' intensities, 'total' or 'both'.
+            plot_type (str): Plot 'simple' intensities, 'total' or 'all'.
             exclude_labels (float): Relative maxima for peak label exclusion
         """
         x, i = self.intensity(phi, x_axis, background, strain_tensor)
@@ -287,10 +338,10 @@ class Peaks(object):
         a_rel = self.relative_heights()
         e_xx, e_yy, e_xy = strain_tensor
         strain = strain_trans(e_xx, e_yy, e_xy, phi)
-        if plot_type == 'all' or plot_type == 'separate':
+        if plot_type == 'all' or plot_type == 'simple':
             for material in i:
                 q0, hkl = self.q0[material], self.hkl[material]
-                x0 = q0 if x_axis == 'q' else self.convert(q0)
+                x0 = q0 if x_axis == 'q' else self._convert(q0)
                 plt.plot(x, i[material], '-', label=material)
                 for idx, a_ in enumerate(a_rel[material]):
 
@@ -301,8 +352,8 @@ class Peaks(object):
                                      xytext=(0, 0), textcoords='offset points',
                                      ha='center', va='bottom')
 
-        if plot_type in ['all', 'total'] and len(i) > 1:
-            plt.plot(x, i_total, 'k:', label='total')
+        if plot_type in ['all', 'total']:
+            plt.plot(x, i_total, '-', color='0.3', label='total')
 
         legend = plt.legend()
         legend.get_frame().set_color('white')

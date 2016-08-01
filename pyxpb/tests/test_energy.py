@@ -9,7 +9,7 @@ import numpy as np
 from pyxpb.detectors import i12_energy
 
 i12 = i12_energy()
-i12.add_peaks('Fe')
+i12.add_material('Fe')
 
 
 def test_intensity_profiles():
@@ -37,6 +37,8 @@ def test_all_intensity():
 @patch("matplotlib.pyplot.show")
 def test_plot_intensity(mock_show):
     mock_show.return_value = None
+    i12.define_background([0, 1, 2, 3, 4, 5, 6, 7],
+                          [0, 2, 3, 3.5, 3.75, 3.5, 3, 2], k=2)
     i12.plot_intensity()
     i12.intensity_factors('Fe', plot=True)
 

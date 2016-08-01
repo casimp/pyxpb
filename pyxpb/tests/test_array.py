@@ -14,8 +14,8 @@ mono = MonoDetector(shape=(2000, 2000), pixel_size=0.2,
                     sample_detector=700, energy=100,
                     energy_sigma=0.5)
 
-i12.add_peaks('Fe')
-mono.add_peaks('Fe')
+i12.add_material('Fe')
+mono.add_material('Fe')
 
 
 def test_ring():

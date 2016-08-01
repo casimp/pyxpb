@@ -11,7 +11,7 @@ from pyxpb.detectors import MonoDetector
 mono = MonoDetector(shape=(2000, 2000), pixel_size=0.2,
                     sample_detector=700, energy=100,
                     energy_sigma=0.5)
-mono.add_peaks('Fe')
+mono.add_material('Fe')
 
 
 def test_intensity_profiles():
@@ -49,6 +49,8 @@ def test_equal_quadrants():
 @patch("matplotlib.pyplot.show")
 def test_plot_intensity(mock_show):
     mock_show.return_value = None
+    mono.define_background([0, 1, 2, 3, 4, 5, 6, 7],
+                           [0, 2, 3, 3.5, 3.75, 3.5, 3, 2], k=2)
     mono.plot_intensity()
     mono.intensity_factors('Fe', plot=True)
 
