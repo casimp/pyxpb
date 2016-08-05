@@ -10,7 +10,7 @@ from pyxpb.detectors import MonoDetector
 
 mono = MonoDetector(shape=(2000, 2000), pixel_size=0.2,
                     sample_detector=700, energy=100,
-                    energy_sigma=0.5)
+                    delta_energy=0.5)
 mono.add_material('Fe')
 
 

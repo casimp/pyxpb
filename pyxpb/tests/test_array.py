@@ -12,7 +12,7 @@ from pyxpb.array_create import ring_array, intensity_array, gauss2d_tensor
 i12 = i12_energy()
 mono = MonoDetector(shape=(2000, 2000), pixel_size=0.2,
                     sample_detector=700, energy=100,
-                    energy_sigma=0.5)
+                    delta_energy=0.5)
 
 i12.add_material('Fe')
 mono.add_material('Fe')
