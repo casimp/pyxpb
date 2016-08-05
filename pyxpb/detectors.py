@@ -6,17 +6,16 @@ from __future__ import unicode_literals
 import os
 
 import numpy as np
-from numpy.polynomial.chebyshev import chebfit, chebval
 import matplotlib.pyplot as plt
 
-from pyxpb.conversions import tth_to_q, e_to_q, e_to_w, q_to_e
+from pyxpb.conversions import tth_to_q, e_to_q, h, c, eV, q_to_tth
 from scipy.interpolate import InterpolatedUnivariateSpline, interp1d
 from pyxpb.peaks import Peaks, Rings
 
 
 class EnergyDetector(Peaks):
-    def __init__(self, phi, two_theta, energy_bins, energy_v_flux,
-                 gauge_param, energy_res):
+    def __init__(self, phi, two_theta, energy_bins, flux=None,
+                 gauge_param=None, delta_energy=None, F=0.13, e_f=0.003):
         """ Creates instance of energy dispersive x-ray detector.
 
         Creates EDXD detector (array) with associated detector parameters
@@ -27,14 +26,14 @@ class EnergyDetector(Peaks):
         of materials/phases.
 
         Args:
-            phi (np.ndarray): Angle for each of the detectors in detector array
+            phi (ndarray): Angle for each of the detectors in detector array
             two theta (float): Slit angle (rad)
-            energy_bins (np.ndarray): Energy bins (keV)
-            energy_v_flux (tuple): Tuple containing energy v flux measurements
+            energy_bins (ndarray): Energy bins (keV)
+            flux (tuple): Tuple containing (energy, flux) values
             gauge_param (tuple): Tuple containing gauge param (a, b, c, e and
                                  h from Knowles et al.)
-            energy_res (float, tuple): Energy resolution of detector or
-                                       tuple with energy v resolution
+            delta_energy (float, tuple): Energy resolution of detector or
+                                         tuple with energy v resolution
         """
         self.method = 'edxd'
         self.two_theta = two_theta
@@ -42,31 +41,45 @@ class EnergyDetector(Peaks):
         self.energy = energy_bins
         self.q = e_to_q(self.energy, two_theta)
 
-        # Error in angle (alpha)
-        alpha = energy_gauge(*(gauge_param + (False, )))[1]
+        # Calc error in 2theta (alpha) - use I12 setup params if none supplied
+        if gauge_param is None:
+                gauge_param = (0.15, 0.25, 1455, 553, 0, np.pi/36)
+        gauge_temp = tuple(gauge_param ) + (False, )
+        alpha = energy_gauge(*gauge_temp)[1]
 
-        # Energy resolution wrt. energy (used to define FWHM)
-        if isinstance(energy_res, (int, float)):
-            e, res = [energy_bins[0], energy_bins[-1]], [energy_res] * 2
-        else:
-            e, res = energy_res[0], energy_res[1]
-        e_res = InterpolatedUnivariateSpline(e, res, k=1, ext=3)
+        # Energy resolution - use 500eV if none, convert to ndarray if tuple
+        if delta_energy is None:
+            delta_energy = 0.5
+        elif isinstance(delta_energy, (tuple, list)):
+            delta_energy = np.stack((delta_energy[0], delta_energy[1]), 1)
 
-        self.sigma_q = fwhm_energy(e_res, two_theta, alpha)
+        self._fwhm = fwhm_polyest_e(delta_energy, two_theta, alpha, F, e_f)
 
-        # Flux wrt. energy/q
-        q, flux = e_to_q(energy_v_flux[0], two_theta), energy_v_flux[1]
-        self.flux_q = InterpolatedUnivariateSpline(q, flux, k=1, ext=3)
+        # Flux wrt energy - use const. if none, convert to ndarray if tuple
+        if isinstance(flux, (tuple, list)):
+            flux = np.stack((flux[0], flux[1]), 1)
+        elif flux is None:
+            flux = np.array([[0, 1], [self.q.max, 1]])
+
+        q_f = e_to_q(flux[:, 0], two_theta)
+        self.flux_q = InterpolatedUnivariateSpline(q_f, flux[:, 1], k=1, ext=3)
+
+        # Parameter store for save/reload
+        self._det_param = {'phi': phi, 'two_theta': two_theta,
+                           'energy_bins': energy_bins,
+                           'gauge_param': gauge_param,
+                           'delta_energy': delta_energy,
+                           'flux': flux, 'F': F, 'e_f': e_f}
 
         # Empty dicts for storing peaks / materials
-        self.a, self.sigma, self.q0 = {}, {}, {}
+        self.a, self.fwhm, self.q0 = {}, {}, {}
         self.materials, self.hkl = {}, {}
-        self.background = np.ones(1)
+        self._back = np.ones(1)
 
 
 class MonoDetector(Rings):
     def __init__(self, shape, pixel_size, sample_detector, energy,
-                 energy_sigma):
+                 delta_energy):
         """ Creates instance of monochromatic (area) XRD detector.
 
         Creates XRD detector with correct geometry and experimental setup
@@ -84,8 +97,7 @@ class MonoDetector(Rings):
             energy_sigma (float): Energy resolution (keV)
         """
         self.method = 'mono'
-        self.shape, self.pixel_size = shape, pixel_size
-        self.energy, self.sample_detector = energy, sample_detector
+        self.energy = energy
 
         #  Instantiate position array (r, phi, 2theta, q) for detector
         y, x = np.ogrid[:float(shape[0]), :float(shape[1])]
@@ -94,20 +106,31 @@ class MonoDetector(Rings):
         self.phi = np.arctan(y / x)
         self.phi[np.logical_and(x < 0, y > 0)] += np.pi
         self.phi[np.logical_and(x < 0, y < 0)] -= np.pi
-        self.two_theta = np.arctan(r * self.pixel_size / sample_detector)
+        self.two_theta = np.arctan(r * pixel_size / sample_detector)
         self.q = tth_to_q(self.two_theta, energy)
 
-        # Beam energy variation (used to define FWHM)
-        sigma = e_to_q(energy_sigma, np.array([0, self.two_theta.max()]))
-        self.sigma_q = interp1d([0, self.q.max()], sigma)
+        # Beam energy variation (used to estimate FWHM)
+        tth = np.linspace(0, self.two_theta.max(), 100)
+        fwhm_q = e_to_q(delta_energy, tth)
+        fwhm_tth = q_to_tth(fwhm_q, energy)
+
+        # FWHM should vary approx. with Caglioti polynomial
+        self._fwhm = np.polyfit(np.tan(tth / 2), fwhm_tth **2, 3)
 
         # Flux wrt. energy/q - i.e. no variation for mono.
-        self.flux_q = interp1d([0, self.q.max()], [1, 1])
+        self._flux = np.array([[0, 1], [self.q.max(), 1]])
+        # assert np.array_equal(self._flux[:, 0], [0, self.q.max()])
+        self.flux_q = interp1d(self._flux[:, 0], self._flux[:, 1])
+
+        # Parameter store for save/reload
+        self._det_param = {'shape': shape, 'pixel_size': pixel_size,
+                           'sample_detector': sample_detector,
+                           'energy': energy, 'delta_energy': delta_energy}
 
         # Empty dicts for storing peaks / materials
-        self.a, self.sigma, self.q0 = {}, {}, {}
+        self.a, self.fwhm, self.q0 = {}, {}, {}
         self.materials, self.hkl = {}, {}
-        self.background = np.ones(1)
+        self._back = np.ones(1)
 
 
 def energy_gauge(a, b, c, e, h, ttheta, plot=True):
