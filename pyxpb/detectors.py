@@ -129,17 +129,37 @@ def energy_gauge(a, b, c, e, h, ttheta, plot=True):
     return l_total, alpha
 
 
-def fwhm_energy(e_res, ttheta, alpha):
-    C = 4 * np.pi / 1e10
+def fwhm_polyest_e(delta_energy, two_theta, alpha, F, e_f):
+    """ Estimate the fwhm profile in an energy dispersive detector.
 
-    def fwhm(q):
-        energy = q_to_e(q, ttheta)
-        d_e = e_res(energy) / 2
+    Calculates the fwhm wrt. the measurement accuracy of the detectors,
+    the Fano factor contribution and angle variation (due to slit size
+    and positioning.
 
-        return C * ((np.sin((ttheta + alpha)/2) / e_to_w(energy + d_e)) -
-                    (np.sin((ttheta - alpha)/2) / e_to_w(energy - d_e)))
+    Args:
+        delta_energy (ndarray): Energy resolution wrt. energy (keV)
+        two_theta (float): 2theta in radians
+        alpha (float): Half the full angular variation.
+        F (float): Fano factor (approx. 0.13 for Germanium)
+        e_f (float): Energy to make electron-hole pair (approx. 3e-3 keV)
 
-    return fwhm
+    Returns:
+        ndarray: 1d array containing the estimated polynomial (k=2).
+    """
+    # d_E^2 used to calc FWHM -> calc polynomial such that d_E^2 = A*E + B
+    if isinstance(delta_energy, (int, float)):
+        res_sq = [0, delta_energy ** 2]
+    else:
+        e, res = delta_energy[:, 0], delta_energy[:, 1]
+        res_sq = np.polyfit(e, [i ** 2 for i in res], 1)
+
+    # Polynomial terms that should fit fwhm squared
+    fw_base = [(2 * alpha / np.tan(two_theta)) ** 2, F * e_f * 2.35 ** 2, 0]
+    fw_e_sq = np.polyadd(fw_base, res_sq)
+
+    # Conversion factor to put fwhm squared in terms of q
+    e_q = 1000 * eV * 4 * np.pi * np.sin(two_theta / 2) / (h * c * 1e10)
+    return [fw_e_sq[0], fw_e_sq[1] * e_q, fw_e_sq[2] * e_q ** 2]
 
 
 filename = os.path.join(os.path.dirname(__file__), 'data/i12_flux.csv')
