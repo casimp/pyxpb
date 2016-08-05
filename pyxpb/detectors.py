@@ -193,15 +193,6 @@ def i12_energy():
     return EnergyDetector(phi=np.linspace(-np.pi, 0, 23),
                           two_theta=np.pi * (5 / 180),
                           energy_bins=np.linspace(0, 180.5, 4096),
-                          energy_v_flux=(i12_flux[:, 0], i12_flux[:, 1]),
+                          flux=i12_flux,
                           gauge_param=(0.15, 0.25, 1455, 553, 0, np.pi/36),
-                          energy_res=([50, 150], [0.5*0.007, 0.5*0.004]))
-
-# def i12_fwhm_b(energy, p=1):
-#     C = 4 * np.pi / 1e10
-#     ttheta = np.pi * 5 / 180
-#     alpha = i12_gauge(0, False)[1]
-#     d_e = i12_e_res(energy)
-#     print((alpha / np.tan(ttheta)))
-#     #return p * np.sqrt((2 * d_e / energy)**2 + (2.354**2)*(0.13*2.960/(energy*1000)) + (2 * alpha / np.tan(ttheta))**2) * energy
-#     return p * np.sqrt((2 * d_e / energy) ** 2 + (2 * alpha / np.tan(ttheta)) ** 2) * energy
+                          delta_energy=([50, 150], [0.35, 0.6]))
