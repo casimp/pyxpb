@@ -10,7 +10,7 @@ import numpy as np
 from numpy.polynomial.chebyshev import chebval, chebfit
 
 from pyxpb.multiplicity import peak_details
-from pyxpb.conversions import q_to_tth, q_to_e
+from pyxpb.conversions import q_to_tth, q_to_e, tth_to_q
 from pyxpb.intensity_factors import scattering_factor, temp_factor, lp_factor
 
 plt.style.use('ggplot')
@@ -64,7 +64,7 @@ class Peaks(object):
                   '2theta': r'$2\theta$',
                   'energy': 'Energy (keV)'}
 
-    def __init__(self, q, energy, two_theta, phi, sigma_q, flux_q, method):
+    def __init__(self, q, energy, two_theta, phi, fwhm_q, flux_q, method):
         """ XRD peak calculation for defined XRD setup.
 
         Parent class requiring the definition of all diffraction parameters.
@@ -84,7 +84,7 @@ class Peaks(object):
         self.phi = phi
         self.energy = energy
         self.q = q
-        self.sigma_q = sigma_q
+        self.fwhm_q = fwhm_q
         self.flux_q = flux_q
         self.background = np.ones(1)
 
@@ -105,6 +105,17 @@ class Peaks(object):
             return q_to_tth(q, self.energy) * 180 / np.pi
         else:
             return q_to_e(q, self.two_theta)
+
+    def fwhm_q(self, q, param=None):
+        if param is None:
+            param = self._fwhm
+        if self.method == 'mono':
+            theta = q_to_tth(q, self.energy) / 2
+            fwhm_tth = np.polyval(param, np.tan(theta)) ** 0.5
+            return tth_to_q(fwhm_tth, self.energy)
+        else:
+            # print(np.polyval(param, q))
+            return np.polyval(param, q) ** 0.5
 
     def intensity_factors(self, material, b=1, q=None, plot=True, x_axis='q'):
         """ Calculates normalised intensity factors (with option for plotting).
@@ -183,8 +194,9 @@ class Peaks(object):
         integrated_intensity = i_sf * m * i_tf * i_lp * flux * weight
 
         # Gaussian fit parameters
-        sigma = self.sigma_q(q0)
-        self.sigma[material] = sigma
+        fwhm = self.fwhm_q(q0)
+        self.fwhm[material] = fwhm
+        sigma = fwhm / 2.35482
         peak_height = integrated_intensity / (sigma * (2 * np.pi) ** 0.5)
         self.a[material] = peak_height
 
@@ -224,7 +236,7 @@ class Peaks(object):
             y = I[az_idx] if q.ndim == 2 else I
             plt.plot(x, y, 'r+')
             plt.show()
-        self.background = f
+        self._back = f
 
     def relative_heights(self):
         """ Computes relative peak heights wrt. total intensity profile.
@@ -234,11 +246,13 @@ class Peaks(object):
         """
         q0 = np.concatenate([self.q0[i] for i in self.q0])
         a = np.concatenate([self.a[i] for i in self.a])
-        sigma = np.concatenate([self.sigma[i] for i in self.sigma])
+        fwhm = np.concatenate([self.fwhm[i] for i in self.fwhm])
+        sigma = fwhm / 2.35482
         a_max = np.max(strained_gaussians(q0, a, q0, sigma, 0))
         a_rel = {}
         for mat in self.a:
-            q0_, a_, sigma_ = self.q0[mat], self.a[mat], self.sigma[mat]
+            q0_, a_, fwhm_ = self.q0[mat], self.a[mat], self.fwhm[mat]
+            sigma_ = fwhm_ / 2.35482
             a_rel[mat] = strained_gaussians(q0_, a_, q0_, sigma_, 0) / a_max
         return a_rel
 
@@ -286,15 +300,16 @@ class Peaks(object):
         strain = strain_trans(e_xx, e_yy, e_xy, phi)
         i = {}
         for mat in self.q0:
-            q0, a, sigma = self.q0[mat], self.a[mat],  self.sigma[mat]
+            q0, a, fwhm = self.q0[mat], self.a[mat],  self.fwhm[mat]
+            sigma = fwhm / 2.35482
             i[mat] = strained_gaussians(q, a, q0, sigma, strain)
 
         i_total = np.sum([i[mat] for mat in i], axis=0)  # OK?
 
-        if self.background.ndim == 1:
-            back = chebval(q, self.background)
+        if self._back.ndim == 1:
+            back = chebval(q, self._back)
         else:
-            back = chebval(q, self.background[0])
+            back = chebval(q, self._back[0])
         background *= np.max(i_total) * back / np.max(back)
 
         i['total'] = i_total + background
@@ -365,7 +380,7 @@ class Peaks(object):
 
 class Rings(Peaks):
 
-    def __init__(self, q, phi, a, q0, sigma):
+    def __init__(self, q, phi, a, q0, fwhm):
         """ Debye-Scherrer ring calculation and visulisation.
 
         Allows for the calculation of 2D intensity arrays (and vizulisation
@@ -383,7 +398,7 @@ class Rings(Peaks):
         self.q = q
         self.a = a
         self.q0 = q0
-        self.sigma = sigma
+        self.fwhm = fwhm
 
     def rings(self, exclude_criteria=0.01, crop=0.0, background=0.02,
               strain_tensor=(0., 0., 0.)):
@@ -421,7 +436,8 @@ class Rings(Peaks):
         # Flatten all dicts - extracting all Gaussian parameters
         q0 = np.concatenate([self.q0[i] for i in self.q0])
         a = np.concatenate([self.a[i] for i in self.a])
-        sigma = np.concatenate([self.sigma[i] for i in self.sigma])
+        fwhm = np.concatenate([self.fwhm[i] for i in self.fwhm])
+        sigma = fwhm / 2.35482
 
         # Exclude peaks based on rel. height and add strained Gaussian curves
         a_max = np.max(strained_gaussians(q0, a, q0, sigma, 0))
