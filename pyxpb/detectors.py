@@ -115,7 +115,7 @@ class MonoDetector(Rings):
         fwhm_tth = q_to_tth(fwhm_q, energy)
 
         # FWHM should vary approx. with Caglioti polynomial
-        self._fwhm = np.polyfit(np.tan(tth / 2), fwhm_tth **2, 3)
+        self._fwhm = [0.01, 0.01]#np.polyfit(np.tan(tth / 2), fwhm_tth **2, 3)
 
         # Flux wrt. energy/q - i.e. no variation for mono.
         self._flux = np.array([[0, 1], [self.q.max(), 1]])

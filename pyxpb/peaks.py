@@ -106,7 +106,7 @@ class Peaks(object):
         else:
             return q_to_e(q, self.two_theta)
 
-    def fwhm_q(self, q, param=None):
+    def fwhm_q_old(self, q, param=None):
         if param is None:
             param = self._fwhm
         if self.method == 'mono':
@@ -116,6 +116,17 @@ class Peaks(object):
         else:
             # print(np.polyval(param, q))
             return np.polyval(param, q) ** 0.5
+        
+    def fwhm_q(self, q, param=None):
+        if param is None:
+            param = self._fwhm
+        #if self.method == 'mono':
+        #    theta = q_to_tth(q, self.energy) / 2
+        #    fwhm_tth = np.polyval(param, np.tan(theta)) ** 0.5
+        #    return tth_to_q(fwhm_tth, self.energy)
+        #else:
+            # print(np.polyval(param, q))
+        return np.polyval(param, q) #** 0.5
 
     def intensity_factors(self, material, b=1, q=None, plot=True, x_axis='q'):
         """ Calculates normalised intensity factors (with option for plotting).
@@ -223,7 +234,8 @@ class Peaks(object):
             f = chebfit(q, I, k)
         # Calculate fit for each slice
         else:
-            assert self.phi.size == q.shape[0]
+            # assert self.phi.size == q.shape[0], (self.phi.size, q.shape[0])
+            # Doesn't work for 1d / 2d - just let it fail?
             f = np.zeros((self.q.shape[0], k + 1))
 
             for az in range(q.shape[0]):
