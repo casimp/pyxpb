@@ -53,7 +53,7 @@ class EnergyDetector(Peaks):
         elif isinstance(delta_energy, (tuple, list)):
             delta_energy = np.stack((delta_energy[0], delta_energy[1]), 1)
 
-        self._fwhm = fwhm_polyest_e(delta_energy, two_theta, alpha, F, e_f)
+        self._fwhm = [0.01, 0.01] #fwhm_polyest_e(delta_energy, two_theta, alpha, F, e_f)
 
         # Flux wrt energy - use const. if none, convert to ndarray if tuple
         if isinstance(flux, (tuple, list)):

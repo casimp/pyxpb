@@ -17,6 +17,7 @@ def scattering_factor(element, q):
     The values are calculated according to the 9-parameter equation produced
     by Cromer and Mann.
     """
+    element = element.split(' ')[0]
     try:
         a = [df.loc[element][i] for i in ['a0', 'a1', 'a2', 'a3']]
         b = [df.loc[element][i] for i in ['b0', 'b1', 'b2', 'b3']]

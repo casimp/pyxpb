@@ -13,7 +13,7 @@ from pyxpb.multiplicity import peak_details
 from pyxpb.conversions import q_to_tth, q_to_e, tth_to_q
 from pyxpb.intensity_factors import scattering_factor, temp_factor, lp_factor
 
-plt.style.use('ggplot')
+#plt.style.use('ggplot')
 
 
 def strained_gaussians(x, *p):
