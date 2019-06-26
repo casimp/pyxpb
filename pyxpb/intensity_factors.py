@@ -55,7 +55,8 @@ def lp_factor(two_theta):
     diffracted angle (2theta).
     """
     theta = two_theta
-    lorentz = 1 / (4 * np.cos(theta) * np.sin(theta) ** 2)
+    with np.errstate(divide='ignore'):
+        lorentz = 1 / (4 * np.cos(theta) * np.sin(theta) ** 2)
     polarization = (1 + np.cos(2 * theta)**2) / 2
     i_lp = lorentz * polarization
     return i_lp

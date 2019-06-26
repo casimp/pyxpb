@@ -13,7 +13,8 @@ eV = 1.60218 * 10 ** -19
 def e_to_w(energy):
     """ Takes photon energy (keV) -> returns wavelength (m) """
     energy_j = np.array(energy) * 1000 * eV
-    wavelength = h * c / energy_j
+    with np.errstate(divide='ignore'):
+        wavelength = h * c / energy_j
     return wavelength
 
 
@@ -35,7 +36,8 @@ def e_to_q(energy, two_theta):
 def q_to_e(q, two_theta):
     """ Takes q (A-1) and 2theta (rad) -> returns energy (keV) """
     q_per_m = np.array(q) * (10**10)
-    wavelength = np.sin(two_theta / 2) * 4 * np.pi / q_per_m
+    with np.errstate(divide='ignore'):
+        wavelength = np.sin(two_theta / 2) * 4 * np.pi / q_per_m
     return w_to_e(wavelength)
 
 
