@@ -482,4 +482,4 @@ class Rings(Peaks):
         """
         img = self.rings(exclude_criteria, crop, background, strain_tensor)
         plt.imshow(img)
-        plt.show()
+        # plt.show()

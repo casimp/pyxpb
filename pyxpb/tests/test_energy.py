@@ -35,9 +35,9 @@ def test_all_intensity():
     assert i12.intensity()[1]['Fe'].shape == (23, 4096), error
 
 
-@patch("matplotlib.pyplot.show")
-def test_plot_intensity(mock_show):
-    mock_show.return_value = None
+#@patch("matplotlib.pyplot.show")
+def test_plot_intensity():#mock_show):
+    #mock_show.return_value = None
     i12.define_background([0, 1, 2, 3, 4, 5, 6, 7],
                           [0, 2, 3, 3.5, 3.75, 3.5, 3, 2], k=2)
     i12.plot_intensity()
