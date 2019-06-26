@@ -453,7 +453,7 @@ class Rings(Peaks):
 
         # Exclude peaks based on rel. height and add strained Gaussian curves
         a_max = np.max(strained_gaussians(q0, a, q0, sigma, 0))
-        ex = [a > exclude_criteria * np.max(a_max)]
+        ex = (a > exclude_criteria * np.max(a_max))
         img = strained_gaussians(q, a[ex], q0[ex], sigma[ex], strain)
 
         # Normalise peak intensity and add background noise
