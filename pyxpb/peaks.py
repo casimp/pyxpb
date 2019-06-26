@@ -180,7 +180,7 @@ class Peaks(object):
             legend.get_frame().set_color('white')
             plt.ylabel('Relative Intensity Factor')
             plt.xlabel(self.label_dict[x_axis])
-            plt.show()
+            # plt.show()
         else:
             return i_lp, i_sf, i_tf, flux
 
@@ -387,7 +387,7 @@ class Peaks(object):
         plt.xlabel(self.label_dict[x_axis])
         plt.ylabel('Relative Intensity')
         plt.ylim([0, 1.05])
-        plt.show()
+        # plt.show()
 
 
 class Rings(Peaks):
