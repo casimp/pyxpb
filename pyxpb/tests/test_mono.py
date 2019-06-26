@@ -5,7 +5,6 @@ from __future__ import unicode_literals
 
 from mock import patch
 import numpy as np
-import matplotlib.pyplot as plt
 
 from pyxpb.detectors import MonoDetector
 
@@ -47,22 +46,19 @@ def test_equal_quadrants():
     assert np.allclose(top_left, np.rot90(bottom_right, 2)), error
     assert np.allclose(top_right, np.rot90(bottom_left, 2)), error
 
-#@patch("matplotlib.pyplot.show")
-def test_plot_intensity(): #mock_show):
-    #mock_show.return_value = None
+@patch("matplotlib.pyplot.show")
+def test_plot_intensity(mock_show):
+    mock_show.return_value = None
     mono.define_background([0, 1, 2, 3, 4, 5, 6, 7],
                            [0, 2, 3, 3.5, 3.75, 3.5, 3, 2], k=2)
     mono.plot_intensity()
-    plt.close()
     mono.intensity_factors('Fe', plot=True)
-    plt.close()
 
 
-#@patch("matplotlib.pyplot.show")
-def test_plot_rings(): #mock_show):
-    #mock_show.return_value = None
+@patch("matplotlib.pyplot.show")
+def test_plot_rings(mock_show):
+    mock_show.return_value = None
     mono.plot_rings()
-    plt.close()
 
 
 if __name__== '__main__':
