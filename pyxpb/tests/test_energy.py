@@ -5,6 +5,7 @@ from __future__ import unicode_literals
 
 from mock import patch
 import numpy as np
+import matplotlib.pyplot as plt
 
 from pyxpb.detectors import i12_energy
 
@@ -40,7 +41,9 @@ def test_plot_intensity(mock_show):
     i12.define_background([0, 1, 2, 3, 4, 5, 6, 7],
                           [0, 2, 3, 3.5, 3.75, 3.5, 3, 2], k=2)
     i12.plot_intensity()
+    plt.close()
     i12.intensity_factors('Fe', plot=True)
+    plt.close()
 
 
 if __name__ == '__main__':
